@@ -56,7 +56,6 @@ export const STORAGE_KEYS = {
   profiles: "fintwin.profiles.v1",
   onboardingDraft: "fintwin.onboarding-draft.v1",
 } as const;
-
 /** Written by the Phase 1 build before profiles existed; read once to migrate the theme. */
 export const LEGACY_PREFERENCES_STORAGE_KEY = "fintwin.preferences.v1";
 
