@@ -29,8 +29,7 @@ interface TransactionTableProps {
 }
 
 /**
- * Shared transaction table, used by both the dashboard card and the
- * Transaction History page so the two always render a transaction identically.
+ * Transaction table used by the dashboard's recent-transactions card.
  */
 export function TransactionTable({
   transactions,

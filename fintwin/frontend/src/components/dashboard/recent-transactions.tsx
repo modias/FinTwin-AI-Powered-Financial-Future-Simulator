@@ -1,14 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
 import { TransactionTable } from "@/components/shared/transaction-table";
-import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -33,14 +28,6 @@ export function RecentTransactions() {
       <CardHeader>
         <CardTitle className="text-base">Recent transactions</CardTitle>
         <CardDescription>The latest activity on this account.</CardDescription>
-        <CardAction>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/transactions">
-              View all transactions
-              <ArrowRight aria-hidden data-icon="inline-end" />
-            </Link>
-          </Button>
-        </CardAction>
       </CardHeader>
 
       <CardContent>

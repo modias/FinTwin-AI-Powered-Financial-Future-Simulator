@@ -292,7 +292,7 @@ A personal profile has no transactions, and Alex's mock transactions are
 **never** mixed in. Instead:
 
 - the spending breakdown is built from your estimates and labelled that way;
-- Transaction History and Financial Insights explain that there is no history
+- Financial Insights explains that there is no history
   and link to editing the profile;
 - the simulation uses **documented fallback assumptions** for how much
   spending varies (`FALLBACK_SPENDING_VARIATION` in

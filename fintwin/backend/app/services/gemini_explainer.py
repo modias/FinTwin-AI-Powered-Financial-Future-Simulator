@@ -5,6 +5,7 @@ calls the official Google Gen AI SDK, and drops any reply that adds amounts,
 dates, probabilities, or a ranked cause.
 """
 
+import logging
 import re
 from collections.abc import Callable
 from datetime import date
@@ -20,6 +21,8 @@ from app.models.risk_explanation import (
     ScenarioExplanationRequest,
     ScenarioFact,
 )
+
+logger = logging.getLogger(__name__)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -160,7 +163,8 @@ class GeminiExplainer:
             return _call_gemini(self._api_key, self._model, system, user)
         except GeminiUngrounded:
             raise
-        except Exception:
+        except Exception as exc:
+            logger.warning("Gemini call failed: %s: %s", type(exc).__name__, exc)
             raise GeminiUnavailable from None
 
 

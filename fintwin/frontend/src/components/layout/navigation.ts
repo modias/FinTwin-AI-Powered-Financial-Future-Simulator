@@ -2,7 +2,6 @@ import {
   FlaskConical,
   LayoutDashboard,
   Lightbulb,
-  Receipt,
   Settings,
   TrendingUp,
   type LucideIcon,
@@ -40,12 +39,6 @@ export const navItems: NavItem[] = [
     href: "/insights",
     icon: Lightbulb,
     description: "Simulated risk and spending analytics",
-  },
-  {
-    label: "Transaction History",
-    href: "/transactions",
-    icon: Receipt,
-    description: "Search and filter every transaction",
   },
   {
     label: "Settings",
