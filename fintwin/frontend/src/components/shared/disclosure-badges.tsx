@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  */
 
 export const SIMULATION_DISCLAIMER =
-  "FinTwin uses simulated financial outcomes based on your financial profile and modeling assumptions. These results are estimates, not guarantees or personalized financial advice.";
+  "Simulated estimates, not guarantees or financial advice.";
 
 const pathCountFormatter = new Intl.NumberFormat("en-US");
 

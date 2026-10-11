@@ -1,7 +1,9 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
+import { ExplainScenarioButton } from "@/components/dashboard/explain-risk-button";
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
 import {
   SimulatedBadge,
@@ -21,15 +23,22 @@ import { SimulationError, SimulationRunning } from "@/components/simulation/simu
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScenarioComparison, useSimulation } from "@/hooks/use-simulation";
 import { formatProbability } from "@/lib/formatters";
 import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import type { FinancialScenario, SimulationInput } from "@/simulation/types";
 
 interface Preset {
@@ -95,6 +104,7 @@ export function SimulatorView() {
   const { input } = simulation;
   const [draft, setDraft] = useState<ScenarioDraft>(() => emptyScenarioDraft(input));
   const [submitted, setSubmitted] = useState<FinancialScenario | null>(null);
+  const [inputsOpen, setInputsOpen] = useState(false);
 
   // Re-validated against the current inputs on every render.
   const stillValid = submitted
@@ -108,6 +118,8 @@ export function SimulatorView() {
   }
 
   const baseline = simulation.data;
+  const comparedScenario =
+    stillValid && !simulation.error && !comparison.error ? comparison.data?.scenarios[0] : undefined;
 
   return (
     <div className="space-y-6">
@@ -162,6 +174,15 @@ export function SimulatorView() {
               <CardDescription>
                 Your current plan against the same plan with your change.
               </CardDescription>
+              {comparedScenario && comparison.data ? (
+                <CardAction>
+                  <ExplainScenarioButton
+                    input={input}
+                    baseline={comparison.data.baseline}
+                    scenario={comparedScenario}
+                  />
+                </CardAction>
+              ) : null}
             </CardHeader>
             <CardContent className="space-y-4">
               {simulation.error ? (
@@ -173,11 +194,8 @@ export function SimulatorView() {
                   Your settings changed and this what-if no longer fits the{" "}
                   {input.horizonDays}-day forecast. Adjust the date above and run it again.
                 </p>
-              ) : comparison.data && comparison.data.scenarios[0] ? (
-                <ScenarioImpact
-                  baseline={comparison.data.baseline}
-                  scenario={comparison.data.scenarios[0]}
-                />
+              ) : comparison.data && comparedScenario ? (
+                <ScenarioImpact baseline={comparison.data.baseline} scenario={comparedScenario} />
               ) : comparison.isPending ? (
                 <div className="space-y-3">
                   <SimulationRunning pathCount={input.pathCount} label="Comparing across" />
@@ -204,28 +222,48 @@ export function SimulatorView() {
           </Card>
         </div>
 
-        <Card className="h-fit [--card-spacing:--spacing(5)]">
-          <CardHeader>
-            <CardTitle className="text-base">What the simulation uses</CardTitle>
-            <CardDescription>Change these in Settings or by editing your profile.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {baseline ? (
-              <>
-                <ModelInputs result={baseline} isDemo={dataset.source === "demo"} />
-                <ModelWarnings warnings={baseline.warnings} />
-              </>
-            ) : simulation.error ? null : (
-              <div className="space-y-3">
-                <SimulationRunning pathCount={input.pathCount} />
-                {Array.from({ length: 5 }, (_, index) => (
-                  <Skeleton key={index} className="h-10 w-full" />
-                ))}
-              </div>
-            )}
-            <SimulationDisclaimer />
-          </CardContent>
-        </Card>
+        <Collapsible open={inputsOpen} onOpenChange={setInputsOpen} className="h-fit">
+          <Card className="[--card-spacing:--spacing(5)]">
+            <CardHeader>
+              <CardTitle className="text-base">What the simulation uses</CardTitle>
+              <CardDescription>Change these in Settings or by editing your profile.</CardDescription>
+              <CardAction>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={inputsOpen ? "Hide simulation inputs" : "Show simulation inputs"}
+                  >
+                    <ChevronDown
+                      aria-hidden
+                      className={cn("transition-transform duration-200", inputsOpen && "rotate-180")}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CollapsibleContent className="overflow-hidden data-closed:animate-collapsible-up data-open:animate-collapsible-down">
+                <div className="space-y-4">
+                  {baseline ? (
+                    <>
+                      <ModelInputs result={baseline} isDemo={dataset.source === "demo"} />
+                      <ModelWarnings warnings={baseline.warnings} />
+                    </>
+                  ) : simulation.error ? null : (
+                    <div className="space-y-3">
+                      <SimulationRunning pathCount={input.pathCount} />
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <Skeleton key={index} className="h-10 w-full" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+              <SimulationDisclaimer />
+            </CardContent>
+          </Card>
+        </Collapsible>
       </div>
     </div>
   );

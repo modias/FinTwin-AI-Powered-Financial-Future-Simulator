@@ -14,10 +14,10 @@ function variationText(assumptions: SpendingKindAssumptions): string {
   const weekly = formatPercent(assumptions.weeklyVariation * 100, 0);
 
   if (assumptions.basis === "transaction_history" && assumptions.history) {
-    return `varies about ${weekly} week to week, measured from ${assumptions.history.transactions} transactions over ${assumptions.history.weeks} weeks`;
+    return `±${weekly} weekly, from ${assumptions.history.weeks} weeks of history`;
   }
 
-  return `assumed to vary about ${weekly} week to week (a default; there isn’t enough history to measure it)`;
+  return `±${weekly} weekly (default)`;
 }
 
 interface InputRow {
@@ -45,8 +45,8 @@ export function ModelInputs({
       label: "Starting balance",
       value: formatCents(result.openingBalanceCents),
       detail: isDemo
-        ? `The demo account’s balance on ${formatMediumDate(result.referenceDate)}. Past transactions are already in it and are not replayed.`
-        : `What you told us on ${formatMediumDate(result.referenceDate)}.`,
+        ? `Demo balance on ${formatMediumDate(result.referenceDate)}.`
+        : `Entered on ${formatMediumDate(result.referenceDate)}.`,
       source: isDemo ? "historical" : "user_entered",
     },
     {
@@ -54,7 +54,7 @@ export function ModelInputs({
       value: formatCents(totals.scheduledIncomeCents),
       detail: `${totals.scheduledIncomeCount} ${
         totals.scheduledIncomeCount === 1 ? "payment" : "payments"
-      } on their scheduled dates, the same on every path.`,
+      }, fixed.`,
       source: "scheduled",
     },
     {
@@ -62,21 +62,19 @@ export function ModelInputs({
       value: formatCents(totals.scheduledBillsCents),
       detail: `${totals.scheduledBillsCount} ${
         totals.scheduledBillsCount === 1 ? "bill" : "bills"
-      } on their due dates. Never randomised.`,
+      }, fixed.`,
       source: "scheduled",
     },
     {
       label: "Essential spending",
       value: formatCents(totals.expectedEssentialCents),
-      detail: `Expected total. Each path draws its own amounts, which never go below zero; essential spending ${variationText(
-        spendingModel.essential,
-      )}.`,
+      detail: `Expected total, ${variationText(spendingModel.essential)}.`,
       source: spendingModel.essential.basis === "transaction_history" ? "historical" : "estimated",
     },
     {
       label: "Discretionary spending",
       value: formatCents(totals.expectedDiscretionaryCents),
-      detail: `Expected total; discretionary spending ${variationText(spendingModel.discretionary)}.`,
+      detail: `Expected total, ${variationText(spendingModel.discretionary)}.`,
       source:
         spendingModel.discretionary.basis === "transaction_history" ? "historical" : "estimated",
     },
@@ -84,21 +82,21 @@ export function ModelInputs({
       ? {
           label: "Unexpected expenses",
           value: `~${emergencies.eventsPerYear} a year`,
-          detail: `Random surprises averaging ${formatCents(
-            emergencies.meanCostCents,
-          )}, capped at ${formatCents(emergencies.maxCostCents)}. A modelling assumption, not a prediction about you.`,
+          detail: `Avg ${formatCents(emergencies.meanCostCents)}, max ${formatCents(
+            emergencies.maxCostCents,
+          )}.`,
           source: "assumption",
         }
       : {
           label: "Unexpected expenses",
           value: "Off",
-          detail: "Left out at your request, which makes results more optimistic. Change this in Settings.",
+          detail: "Turned off in Settings. Results are more optimistic.",
           source: "assumption",
         },
     {
       label: "Simulations",
       value: pathCountFormatter.format(result.pathCount),
-      detail: `Possible futures over ${result.horizonDays} days, from a fixed seed so the same inputs always give the same answer.`,
+      detail: `Futures over ${result.horizonDays} days.`,
       source: "simulated",
     },
   ];

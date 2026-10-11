@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FlaskConical, PencilLine, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowRight, PencilLine, RotateCcw, Sparkles } from "lucide-react";
 
 import { useWorkspace } from "@/components/providers/workspace-provider";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,8 @@ import { ONBOARDING_STEPS } from "@/lib/onboarding/validation";
 
 /**
  * The welcome screen's buttons depend on what is saved in this browser, so
- * they render after hydration. First-time visitors get the two spec'd
- * choices; returning visitors get a way back to where they were.
+ * they render after hydration. First-time visitors build their twin;
+ * returning visitors get a way back to where they were.
  */
 export function WelcomeActions() {
   const router = useRouter();
@@ -22,7 +22,6 @@ export function WelcomeActions() {
     draft,
     startOnboarding,
     discardDraft,
-    activateDemo,
   } = useWorkspace();
 
   if (!isHydrated) {
@@ -37,11 +36,6 @@ export function WelcomeActions() {
   const buildTwin = () => {
     startOnboarding("blank");
     router.push("/onboarding");
-  };
-
-  const tryDemo = () => {
-    activateDemo();
-    router.push("/overview");
   };
 
   if (activeProfile) {
@@ -98,10 +92,6 @@ export function WelcomeActions() {
             Resume setup
             <ArrowRight aria-hidden />
           </Button>
-          <Button type="button" variant="outline" size="lg" onClick={tryDemo}>
-            <FlaskConical aria-hidden />
-            Try with Demo Data
-          </Button>
         </div>
         <p className="flex flex-wrap items-center justify-center gap-x-2 text-xs text-muted-foreground">
           <span>
@@ -128,15 +118,9 @@ export function WelcomeActions() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 sm:flex-row">
-      <Button type="button" size="lg" className="px-7" onClick={buildTwin}>
-        Build My Financial Twin
-        <ArrowRight aria-hidden />
-      </Button>
-      <Button type="button" variant="outline" size="lg" onClick={tryDemo}>
-        <FlaskConical aria-hidden />
-        Try with Demo Data
-      </Button>
-    </div>
+    <Button type="button" size="lg" className="px-7" onClick={buildTwin}>
+      Build My Financial Twin
+      <ArrowRight aria-hidden />
+    </Button>
   );
 }

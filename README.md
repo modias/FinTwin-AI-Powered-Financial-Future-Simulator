@@ -11,13 +11,14 @@ forward-looking question instead:
 
 ```text
 fintwin/
-└── frontend/    Next.js application with the Monte Carlo engine — complete and runnable
+├── frontend/    Next.js application with the Monte Carlo engine
+└── backend/     FastAPI service for the Capital One Nessie sandbox
 ```
 
-A `fintwin/backend/` directory (FastAPI, Capital One Nessie integration)
-comes later. The frontend already defines the service interface and Zod
-schemas that backend will implement; the simulation runs in the browser and
-does not depend on it.
+The simulation still runs in the browser from the onboarding profile or the
+demo dataset. The backend only fetches Nessie sandbox customers, accounts, and
+transactions. It does not replace that profile, and the Nessie API key never
+goes to the frontend.
 
 ## Running it
 
@@ -72,7 +73,7 @@ browser.
 | ----- | ------------------------------------------------------------------------ |
 | 1     | **Done** — app shell, dashboard, onboarding, typed services              |
 | 2     | **Done** — Monte Carlo engine, Safe to Spend, what-ifs, percentile bands |
-| 2     | FastAPI backend, Capital One Nessie integration                          |
+| 2     | **In progress** — FastAPI backend reads the Nessie sandbox; it does not feed the simulation yet |
 | 3+    | Gemini-generated explanations, voice summaries, authentication        |
 
 ## License

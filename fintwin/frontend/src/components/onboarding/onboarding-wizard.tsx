@@ -7,7 +7,6 @@ import { ArrowLeft, ArrowRight, ListChecks } from "lucide-react";
 import { errorId } from "@/components/onboarding/fields";
 import { HousingStep } from "@/components/onboarding/housing-step";
 import { IncomeStep } from "@/components/onboarding/income-step";
-import { PrivacyNotice } from "@/components/onboarding/privacy-notice";
 import { SafetyStep } from "@/components/onboarding/safety-step";
 import { SpendingStep } from "@/components/onboarding/spending-step";
 import { StepProgress } from "@/components/onboarding/step-progress";
@@ -211,8 +210,6 @@ export function OnboardingWizard() {
           </div>
         </CardContent>
       </Card>
-
-      <PrivacyNotice />
     </div>
   );
 }

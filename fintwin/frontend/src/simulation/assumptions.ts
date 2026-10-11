@@ -19,7 +19,7 @@
  *   With transaction history (at least `HISTORY_REQUIREMENTS`), weekly
  *   variation is measured from weekly totals and level variation is the
  *   relative standard error of their mean. Without it, the fallbacks below
- *   apply and the result carries a "limited information" warning.
+ *   apply.
  *
  * Unexpected expenses
  *   Poisson arrivals at `eventsPerYear`, lognormal costs with mean

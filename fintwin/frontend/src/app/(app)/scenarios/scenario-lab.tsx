@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trophy, X } from "lucide-react";
+import { Pencil, Plus, Trophy, X } from "lucide-react";
 
 import {
   SimulatedBadge,
@@ -26,6 +26,7 @@ import { SimulationError, SimulationRunning } from "@/components/simulation/simu
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -99,6 +100,8 @@ export function ScenarioLab() {
   const [scenarios, setScenarios] = useState<FinancialScenario[]>(() => laptopExamples(input));
   const [draft, setDraft] = useState<ScenarioDraft>(() => emptyScenarioDraft(input));
   const [chartIndex, setChartIndex] = useState(0);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<FinancialScenario | null>(null);
 
   // Scenarios whose dates no longer fit (after a horizon change) are set aside, not silently run.
   const valid = scenarios.filter(
@@ -111,25 +114,49 @@ export function ScenarioLab() {
   const shownIndex = Math.min(chartIndex, Math.max(0, results.length - 1));
   const best = results.length > 1 ? bestIndex(results) : null;
 
-  function add(scenario: FinancialScenario) {
-    if (isFull) return;
-
-    const id = scenarios.some((existing) => existing.id === scenario.id)
-      ? `${scenario.id}:${scenarios.length}`
-      : scenario.id;
-
-    setScenarios([...scenarios, { ...scenario, id }]);
+  function closeForm() {
+    setFormOpen(false);
+    setEditing(null);
     setDraft(emptyScenarioDraft(input));
+  }
+
+  function save(scenario: FinancialScenario) {
+    if (editing) {
+      setScenarios(
+        scenarios.map((existing) =>
+          existing.id === editing.id ? { ...scenario, id: editing.id } : existing,
+        ),
+      );
+    } else {
+      if (isFull) return;
+
+      const id = scenarios.some((existing) => existing.id === scenario.id)
+        ? `${scenario.id}:${scenarios.length}`
+        : scenario.id;
+
+      setScenarios([...scenarios, { ...scenario, id }]);
+    }
+
+    closeForm();
   }
 
   function remove(id: string) {
     setScenarios(scenarios.filter((scenario) => scenario.id !== id));
     setChartIndex(0);
+
+    if (editing?.id === id) closeForm();
   }
 
   function edit(scenario: FinancialScenario) {
     setDraft(draftFromScenario(scenario));
-    remove(scenario.id);
+    setEditing(scenario);
+    setFormOpen(true);
+  }
+
+  function openNew() {
+    setDraft(emptyScenarioDraft(input));
+    setEditing(null);
+    setFormOpen(true);
   }
 
   return (
@@ -142,38 +169,51 @@ export function ScenarioLab() {
         actions={<SimulatedBadge pathCount={input.pathCount} />}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Card className="[--card-spacing:--spacing(5)]">
-            <CardHeader>
-              <CardTitle className="text-base">
-                Your options ({scenarios.length} of {MAX_SCENARIOS})
-              </CardTitle>
-              <CardDescription>Remove one to make room for another.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {scenarios.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No options yet. Add one below.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/60">
-                  {scenarios.map((scenario) => {
-                    const isValid = valid.includes(scenario);
+      <div className="space-y-6">
+        <Card className="[--card-spacing:--spacing(5)]">
+          <CardHeader>
+            <CardTitle className="text-base">
+              Your options ({scenarios.length} of {MAX_SCENARIOS})
+            </CardTitle>
+            <CardDescription>
+              {isFull ? "Remove one to make room for another." : "Edit one, or add another."}
+            </CardDescription>
+            {!isFull && !formOpen ? (
+              <CardAction>
+                <Button size="sm" variant="outline" onClick={openNew}>
+                  <Plus aria-hidden />
+                  Add option
+                </Button>
+              </CardAction>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {scenarios.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No options yet. Add one to start comparing.
+              </p>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {scenarios.map((scenario) => {
+                  const isValid = valid.includes(scenario);
 
-                    return (
-                      <li key={scenario.id} className="flex items-start gap-3 py-2.5">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium">
-                            {scenario.description}
-                            <SourceTag source="hypothetical" />
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {isValid
-                              ? describeScenario(scenario)
-                              : `Outside the ${input.horizonDays}-day forecast — edit its date.`}
-                          </p>
-                        </div>
+                  return (
+                    <li
+                      key={scenario.id}
+                      className="flex items-start gap-1 rounded-lg border border-border/60 bg-muted/30 p-3"
+                    >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium">
+                          {scenario.description}
+                          <SourceTag source="hypothetical" />
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {isValid
+                            ? describeScenario(scenario)
+                            : `Outside the ${input.horizonDays}-day forecast — edit its date.`}
+                        </p>
+                      </div>
+                      <div className="-mt-1 -mr-1 flex shrink-0">
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -190,20 +230,24 @@ export function ScenarioLab() {
                         >
                           <X aria-hidden />
                         </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
+        {formOpen ? (
           <Card className="[--card-spacing:--spacing(5)]">
             <CardHeader>
-              <CardTitle className="text-base">Add an option</CardTitle>
+              <CardTitle className="text-base">
+                {editing ? `Editing “${editing.description}”` : "Add an option"}
+              </CardTitle>
               <CardDescription>
-                {isFull
-                  ? `You’re comparing the maximum of ${MAX_SCENARIOS}. Remove one to add another.`
+                {editing
+                  ? "Change the details, then save to update the comparison."
                   : "Describe a decision to compare."}
               </CardDescription>
             </CardHeader>
@@ -213,15 +257,19 @@ export function ScenarioLab() {
                 input={input}
                 draft={draft}
                 onDraftChange={setDraft}
-                onSubmit={add}
-                submitLabel="Add to comparison"
-                disabled={isFull}
+                onSubmit={save}
+                submitLabel={editing ? "Save changes" : "Add to comparison"}
+                footer={
+                  <Button type="button" variant="ghost" onClick={closeForm}>
+                    Cancel
+                  </Button>
+                }
               />
             </CardContent>
           </Card>
-        </div>
+        ) : null}
 
-        <Card className="h-fit [--card-spacing:--spacing(5)]">
+        <Card className="[--card-spacing:--spacing(5)]">
           <CardHeader>
             <CardTitle className="text-base">Comparison</CardTitle>
             <CardDescription>

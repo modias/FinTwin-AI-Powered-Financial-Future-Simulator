@@ -2,6 +2,7 @@
 
 import { ArrowDownRight, CalendarClock, ShieldCheck, TriangleAlert } from "lucide-react";
 
+import { ExplainRiskButton } from "@/components/dashboard/explain-risk-button";
 import { SourceTag } from "@/components/shared/disclosure-badges";
 import { MetricCard, MetricCardSkeleton } from "@/components/shared/metric-card";
 import { useFinancialSummary } from "@/hooks/use-financial-data";
@@ -17,7 +18,7 @@ const pathCountFormatter = new Intl.NumberFormat("en-US");
  * from the schedule, each labelled with where it comes from.
  */
 export function FinancialSummaryCards() {
-  const { data: result } = useSimulation();
+  const { data: result, input } = useSimulation();
   const { data: summary } = useFinancialSummary();
 
   if (!result || !summary) {
@@ -47,7 +48,12 @@ export function FinancialSummaryCards() {
         } your ${target}% target.`}
         icon={ShieldCheck}
         tone={meetsTarget ? "positive" : "risk"}
-        badge={<SourceTag source="simulated" />}
+        badge={
+          <div className="flex w-full items-center justify-between gap-2">
+            <SourceTag source="simulated" />
+            <ExplainRiskButton input={input} result={result} />
+          </div>
+        }
       />
 
       <MetricCard

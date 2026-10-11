@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { Check, Monitor, Moon, RotateCcw, Sun } from "lucide-react";
 
 import { ProfileSettingsCard } from "@/app/(app)/settings/profile-settings-card";
-import { PrivacyNotice } from "@/components/onboarding/privacy-notice";
+import { NessieSandboxCard } from "@/components/settings/nessie-sandbox-card";
 import { useActiveWorkspace, useWorkspace } from "@/components/providers/workspace-provider";
 import { SimulationDisclaimer } from "@/components/shared/disclosure-badges";
 import { OptionTile } from "@/components/shared/option-tile";
@@ -143,6 +143,8 @@ export function SettingsView() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <ProfileSettingsCard />
+
+          <NessieSandboxCard />
 
           <Card className="[--card-spacing:--spacing(5)]">
             <CardHeader>
@@ -371,9 +373,9 @@ export function SettingsView() {
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Your answers and preferences
                 {isHydrated ? " have been loaded" : " are loading"} from this
-                browser. There is no backend and no account in this build.
+                browser. The simulation still uses that profile. The Capital
+                One sandbox is a separate local server and does not replace it.
               </p>
-              <PrivacyNotice />
             </CardContent>
           </Card>
         </div>

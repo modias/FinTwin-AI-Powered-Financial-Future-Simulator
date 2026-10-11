@@ -5,10 +5,7 @@ import { useState } from "react";
 import { ChevronDown, FlaskConical, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
-import {
-  SimulatedBadge,
-  SimulationDisclaimer,
-} from "@/components/shared/disclosure-badges";
+import { SimulatedBadge } from "@/components/shared/disclosure-badges";
 import { ModelInputs, ModelWarnings } from "@/components/simulation/model-inputs";
 import { SimulationError, SimulationRunning } from "@/components/simulation/simulation-states";
 import { Button } from "@/components/ui/button";
@@ -205,7 +202,6 @@ function CalculationDisclosure({ result, isDemo }: { result: SimulationResult; i
             />
           </Button>
         </CollapsibleTrigger>
-        <SimulationDisclaimer className="max-w-xl sm:text-right" />
       </div>
 
       <CollapsibleContent className="overflow-hidden data-closed:animate-collapsible-up data-open:animate-collapsible-down">

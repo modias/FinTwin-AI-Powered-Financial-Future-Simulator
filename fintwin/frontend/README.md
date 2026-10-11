@@ -80,8 +80,11 @@ screen, and labels every figure by where it came from: **user-entered**,
 - Account switching, transaction search and filtering, light (default), dark
   and system themes.
 
-**Deliberately absent:** authentication, payments, and the Nessie / FastAPI /
-Gemini integrations. No request leaves the browser.
+**Deliberately absent:** authentication, payments, and Gemini. The optional
+Capital One sandbox panel in Settings (development only) calls the local
+FastAPI backend; the Nessie API key stays on that server. The dashboard and
+the simulation still use the onboarding profile or the demo dataset, and no
+Nessie request is made unless you load sandbox customers.
 
 The rule applied throughout: **never a fabricated result.** No figure is a
 placeholder, no chart value is random per render, and nothing in the UI is a
@@ -584,5 +587,5 @@ values do not shift as they change.
 | ----- | ------------------------------------------------------------------------ |
 | 1     | **Done** — app shell, dashboard, onboarding, typed services              |
 | 2     | **Done** — Monte Carlo engine, Safe to Spend, what-ifs, percentile bands |
-| 2     | FastAPI backend (`backend/`), Capital One Nessie integration             |
+| 2     | **In progress** — local FastAPI backend reads the Nessie sandbox; it does not feed the simulation yet |
 | 3+    | Gemini-generated explanations, voice summaries, authentication           |

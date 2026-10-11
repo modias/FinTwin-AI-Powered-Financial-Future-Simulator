@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FlaskConical, PencilLine, RotateCcw, Sparkles, UserRound } from "lucide-react";
+import { PencilLine, RotateCcw, Sparkles, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
@@ -28,7 +28,7 @@ import { formatMediumDate } from "@/lib/dates";
 
 /**
  * Everything about the profile behind the dashboard: which one is active,
- * editing its answers, switching between it and the demo, and starting over.
+ * editing its answers, and starting over.
  */
 export function ProfileSettingsCard() {
   const router = useRouter();
@@ -37,7 +37,6 @@ export function ProfileSettingsCard() {
     profiles,
     draft,
     startOnboarding,
-    activateDemo,
     activatePersonal,
     resetOnboarding,
   } = useActiveWorkspace();
@@ -114,30 +113,14 @@ export function ProfileSettingsCard() {
                 Build My Financial Twin
               </Button>
             )
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                activateDemo();
-                toast.success("Switched to demo data", {
-                  description: "Your own answers are kept. Switch back here anytime.",
-                });
-              }}
-            >
-              <FlaskConical aria-hidden />
-              Switch to demo data
-            </Button>
-          )}
+          ) : null}
         </div>
 
         <div className="space-y-2 border-t border-border/60 pt-4">
           <p className="text-[13px] font-medium">Start over</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Deletes your answers, any unfinished setup and the demo selection
-            from this browser, then returns to the welcome screen. Your theme
-            is kept.
+            Deletes your answers and any unfinished setup from this browser,
+            then returns to the welcome screen. Your theme is kept.
           </p>
           <Popover open={isConfirmingReset} onOpenChange={setIsConfirmingReset}>
             <PopoverTrigger asChild>
@@ -151,7 +134,7 @@ export function ProfileSettingsCard() {
                 <PopoverTitle>Delete your financial profile?</PopoverTitle>
                 <PopoverDescription className="text-xs leading-relaxed">
                   This can&rsquo;t be undone. You&rsquo;ll answer the setup
-                  questions again or pick the demo data.
+                  questions again.
                 </PopoverDescription>
               </PopoverHeader>
               <div className="flex justify-end gap-2 pt-1">

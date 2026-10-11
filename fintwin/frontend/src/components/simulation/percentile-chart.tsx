@@ -38,7 +38,7 @@ interface ChartRow {
 }
 
 export const BAND_EXPLANATION =
-  "The shaded band holds the middle 80% of simulated balances each day (10th to 90th percentile). It is not a 95% confidence interval, and real balances can fall outside it.";
+  "Shaded band: middle 80% of simulated balances (10th–90th percentile).";
 
 /**
  * Daily balance percentiles across the simulated paths, with an optional

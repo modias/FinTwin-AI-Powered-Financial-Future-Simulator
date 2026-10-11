@@ -3,11 +3,7 @@
 import { ArrowDownRight, TrendingUp } from "lucide-react";
 
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
-import {
-  Disclaimer,
-  SimulatedBadge,
-  SimulationDisclaimer,
-} from "@/components/shared/disclosure-badges";
+import { Disclaimer, SimulatedBadge } from "@/components/shared/disclosure-badges";
 import { ChartSkeleton } from "@/components/shared/loading-skeleton";
 import {
   BAND_EXPLANATION,
@@ -101,10 +97,7 @@ export function ForecastChart() {
             <div />
           )}
 
-          <div className="max-w-md space-y-1.5 lg:text-right">
-            <Disclaimer>{BAND_EXPLANATION}</Disclaimer>
-            <SimulationDisclaimer />
-          </div>
+          <Disclaimer className="max-w-md lg:text-right">{BAND_EXPLANATION}</Disclaimer>
         </div>
       </CardContent>
     </Card>

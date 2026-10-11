@@ -1,7 +1,10 @@
 "use client";
 
 import { Bell, BellOff, CalendarClock, Landmark } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
+import { requestEventFocus } from "@/components/dashboard/event-focus";
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,10 +32,11 @@ export function NotificationsMenu() {
     NOTIFICATION_WINDOW_DAYS,
   );
 
+  const [open, setOpen] = useState(false);
   const count = events?.length ?? 0;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell aria-hidden />
@@ -81,42 +85,50 @@ export function NotificationsMenu() {
                 const isIncome = event.direction === "income";
 
                 return (
-                  <li
-                    key={event.id}
-                    className="flex items-start gap-3 rounded-lg px-2 py-2"
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
-                        isIncome
-                          ? "bg-success/12 text-success"
-                          : "bg-muted text-muted-foreground",
-                      )}
+                  <li key={event.id}>
+                    <Link
+                      href="/overview"
+                      scroll={false}
+                      title="Show in Upcoming financial events"
+                      onClick={() => {
+                        requestEventFocus(event.id);
+                        setOpen(false);
+                      }}
+                      className="flex items-start gap-3 rounded-lg px-2 py-2 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
-                      {isIncome ? (
-                        <Landmark aria-hidden className="size-3.5" />
-                      ) : (
-                        <CalendarClock aria-hidden className="size-3.5" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">
-                        {event.name}
+                      <span
+                        className={cn(
+                          "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                          isIncome
+                            ? "bg-success/12 text-success"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {isIncome ? (
+                          <Landmark aria-hidden className="size-3.5" />
+                        ) : (
+                          <CalendarClock aria-hidden className="size-3.5" />
+                        )}
                       </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {formatShortDate(event.date)} ·{" "}
-                        {formatRelativeDay(event.date, referenceDate)}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium">
+                          {event.name}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatShortDate(event.date)} ·{" "}
+                          {formatRelativeDay(event.date, referenceDate)}
+                        </span>
                       </span>
-                    </span>
-                    <span
-                      className={cn(
-                        "tabular-figures text-[13px] font-medium",
-                        isIncome ? "text-success" : "text-foreground",
-                      )}
-                    >
-                      {isIncome ? "+" : "\u2212"}
-                      {formatCurrency(event.amount)}
-                    </span>
+                      <span
+                        className={cn(
+                          "tabular-figures text-[13px] font-medium",
+                          isIncome ? "text-success" : "text-foreground",
+                        )}
+                      >
+                        {isIncome ? "+" : "\u2212"}
+                        {formatCurrency(event.amount)}
+                      </span>
+                    </Link>
                   </li>
                 );
               })}

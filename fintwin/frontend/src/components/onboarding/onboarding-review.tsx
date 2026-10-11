@@ -14,7 +14,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { PrivacyNotice } from "@/components/onboarding/privacy-notice";
 import { StepProgress } from "@/components/onboarding/step-progress";
 import { useWorkspace } from "@/components/providers/workspace-provider";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -307,8 +306,7 @@ export function OnboardingReview() {
 
         {draft.basedOn === "demo" ? (
           <p className="text-xs text-muted-foreground">
-            These started as the demo answers. Saving creates your own profile;
-            the demo data stays available from Settings.
+            These started as the demo answers. Saving creates your own profile.
           </p>
         ) : null}
 
@@ -343,8 +341,6 @@ export function OnboardingReview() {
           </Button>
         </div>
       </div>
-
-      <PrivacyNotice />
     </div>
   );
 }

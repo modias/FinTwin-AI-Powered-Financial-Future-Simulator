@@ -1,6 +1,5 @@
 import { LineChart, Shield, Wallet } from "lucide-react";
 
-import { PrivacyNotice } from "@/components/onboarding/privacy-notice";
 import { WelcomeActions } from "@/components/onboarding/welcome-actions";
 import { SIMULATION_DISCLAIMER } from "@/components/shared/disclosure-badges";
 import { FinTwinLogo } from "@/components/shared/fintwin-logo";
@@ -10,8 +9,8 @@ import { APP_NAME } from "@/lib/constants";
  * The welcome screen.
  *
  * It renders outside the `(app)` route group, so there is no sidebar or header
- * here. Visitors either build their own financial twin through the
- * questionnaire or explore the seeded demo data. It never redirects, so the
+ * here. Visitors build their own financial twin through the questionnaire.
+ * It never redirects, so the
  * dashboard's "no profile yet" redirect back here cannot loop.
  */
 export default function WelcomePage() {
@@ -64,9 +63,7 @@ export default function WelcomePage() {
           />
         </ul>
 
-        <PrivacyNotice className="animate-in fade-in mt-8 delay-300 duration-700" />
-
-        <p className="animate-in fade-in mt-6 max-w-md text-xs leading-relaxed text-muted-foreground delay-300 duration-700">
+        <p className="animate-in fade-in mt-8 max-w-md text-xs leading-relaxed text-muted-foreground delay-300 duration-700">
           {SIMULATION_DISCLAIMER}
         </p>
       </div>

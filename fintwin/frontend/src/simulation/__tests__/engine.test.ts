@@ -556,7 +556,7 @@ describe("17. percentiles", () => {
 });
 
 describe("18. fallback assumptions", () => {
-  it("uses documented defaults and warns about limited information without history", () => {
+  it("uses documented defaults without history", () => {
     const input = makeInput(datasetForProfile(makeProfile()));
 
     expect(input.spendingModel.essential).toMatchObject({
@@ -568,9 +568,7 @@ describe("18. fallback assumptions", () => {
       basis: "fallback",
       ...FALLBACK_SPENDING_VARIATION.discretionary,
     });
-    expect(input.warnings.find((warning) => warning.code === "limited_history")?.message).toMatch(
-      /limited information/,
-    );
+    expect(input.warnings.some((warning) => warning.code === "limited_history")).toBe(false);
   });
 
   it("measures variation from history when there is enough", () => {

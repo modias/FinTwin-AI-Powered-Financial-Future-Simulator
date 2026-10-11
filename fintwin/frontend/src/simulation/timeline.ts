@@ -268,13 +268,7 @@ function modelWarnings({
     (kind) => spendingModel[kind].basis === "fallback",
   );
 
-  if (!hasHistory) {
-    warnings.push({
-      code: "limited_history",
-      message:
-        "FinTwin has no transaction history for this account, so it has limited information: spending is based on your estimates and how much it varies uses default assumptions. Treat these results as a rough guide.",
-    });
-  } else if (fallbackKinds.length > 0) {
+  if (hasHistory && fallbackKinds.length > 0) {
     warnings.push({
       code: "limited_history",
       message: `There isn’t enough transaction history to measure how your ${fallbackKinds.join(
