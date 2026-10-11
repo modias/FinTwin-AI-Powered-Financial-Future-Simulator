@@ -307,8 +307,7 @@ development and shouldn't be exposed publicly without authentication.
 
 I used AI tools during the development of FinTwin to help brainstorm and refine
 the project idea, troubleshoot errors in the code, and assist with debugging and
-development. I reviewed and tested the resulting changes as part of building the
-project.
+development.  I also used Grok to help create the demo video. I reviewed and tested the code throughout the project.
 
 That is separate from the **Google Gemini API, which is a feature inside
 FinTwin**. When a user clicks "Explain My Risk", the backend sends the simulation's already-calculated results to Gemini and gets
