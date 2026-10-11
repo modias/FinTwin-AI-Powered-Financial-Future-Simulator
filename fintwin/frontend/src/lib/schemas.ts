@@ -24,11 +24,7 @@ import {
   type CashFlowEvent,
   type CategorySpend,
   type FinancialSummary,
-  type ForecastPoint,
-  type ForecastSeries,
   type IncomeSource,
-  type SafeToSpendEstimate,
-  type SafeToSpendLine,
   type SpendingSummary,
   type Transaction,
   type UserPreferences,
@@ -41,6 +37,7 @@ const money = z.number().finite().nonnegative();
 export const transactionCategorySchema = z.enum(TRANSACTION_CATEGORIES);
 export const cadenceSchema = z.enum(["weekly", "biweekly", "monthly"]);
 export const eventConfidenceSchema = z.enum(["scheduled", "estimated"]);
+export const spendingKindSchema = z.enum(["essential", "discretionary", "unexpected"]);
 
 export const accountSchema = z.object({
   id: z.string().min(1),
@@ -74,6 +71,7 @@ export const billSchema = z.object({
   anchorDate: isoDate,
   confidence: eventConfidenceSchema,
   autoPay: z.boolean(),
+  spendingKind: spendingKindSchema.optional(),
 }) satisfies z.ZodType<Bill>;
 
 export const incomeSourceSchema = z.object({
@@ -97,51 +95,8 @@ export const cashFlowEventSchema = z.object({
   direction: z.enum(["income", "expense"]),
   confidence: eventConfidenceSchema,
   sourceId: z.string().min(1),
+  spendingKind: spendingKindSchema.optional(),
 }) satisfies z.ZodType<CashFlowEvent>;
-
-export const forecastPointSchema = z.object({
-  date: isoDate,
-  dayIndex: z.number().int().nonnegative(),
-  projectedBalance: z.number().finite(),
-  income: z.number().finite(),
-  bills: z.number().finite(),
-  estimatedSpending: z.number().finite(),
-  protectedBalance: z.number().finite(),
-}) satisfies z.ZodType<ForecastPoint>;
-
-export const forecastSeriesSchema = z.object({
-  accountId: z.string().min(1),
-  horizonDays: z.number().int().positive(),
-  startDate: isoDate,
-  startingBalance: z.number().finite(),
-  protectedBalance: z.number().finite(),
-  points: z.array(forecastPointSchema).min(1),
-  endingBalance: z.number().finite(),
-  lowestProjectedBalance: z.number().finite(),
-  lowestProjectedBalanceDate: isoDate,
-  daysBelowProtectedBalance: z.number().int().nonnegative(),
-  method: z.literal("deterministic-illustrative"),
-}) satisfies z.ZodType<ForecastSeries>;
-
-export const safeToSpendLineSchema = z.object({
-  label: z.string().min(1),
-  description: z.string().min(1),
-  amount: z.number().finite(),
-  effect: z.enum(["add", "subtract"]),
-}) satisfies z.ZodType<SafeToSpendLine>;
-
-export const safeToSpendEstimateSchema = z.object({
-  amount: money,
-  clamped: z.boolean(),
-  rawAmount: z.number().finite(),
-  currentBalance: z.number().finite(),
-  reservedUpcomingBills: z.number().finite(),
-  expectedEssentialExpenses: z.number().finite(),
-  minimumProtectedBalance: z.number().finite(),
-  reservationWindowDays: z.number().int().positive(),
-  breakdown: z.array(safeToSpendLineSchema),
-  method: z.literal("illustrative-placeholder"),
-}) satisfies z.ZodType<SafeToSpendEstimate>;
 
 export const categorySpendSchema = z.object({
   category: transactionCategorySchema,
@@ -173,8 +128,6 @@ export const financialSummarySchema = z.object({
   expectedIncomeTotal: z.number().finite(),
   nextIncomeDate: isoDate.nullable(),
   nextIncomeAmount: z.number().finite().nullable(),
-  safeToSpend: safeToSpendEstimateSchema,
-  simulationStatus: z.literal("unavailable"),
 }) satisfies z.ZodType<FinancialSummary>;
 
 export const userProfileSchema = z.object({

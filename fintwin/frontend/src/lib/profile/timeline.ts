@@ -3,17 +3,19 @@
  *
  * The output is the same `Bill` / `IncomeSource` / `CashFlowEvent` shapes the
  * demo dataset is written in, expanded by the same `expandCashFlowEvents` and
- * projected by the same `buildForecast`. Nothing here forecasts; it only
+ * simulated by the same Monte Carlo engine. Nothing here forecasts; it only
  * describes the user's schedule.
  *
  * Rules the conversion keeps:
  *  - Housing becomes exactly one bill. Onboarding rejects a recurring bill
  *    that duplicates it, so rent is never counted twice.
  *  - Recurring bills are `scheduled`; everyday spending and the
- *    unexpected-expense allowance are `estimated`, so the forecast and the
- *    safe-to-spend breakdown keep them apart and label them as estimates.
+ *    unexpected-expense allowance are `estimated`, so the simulation varies
+ *    them and the UI labels them as estimates.
  *  - Everyday spending is entered without fixed bills (the questionnaire says
- *    so), so it is added once, as its own estimate.
+ *    so), so it is added once, split into an essential estimate (groceries
+ *    and transportation) and a discretionary one, which the simulation lets
+ *    vary by different amounts.
  *  - Dates come from the user: paydays and due dates are anchors they entered,
  *    never guessed. Irregular income enters only as the payments they listed.
  *  - No history is replayed: the forecast starts from the entered balance on
@@ -47,6 +49,7 @@ import {
   VARIABLE_SPENDING_CATEGORIES,
   type FinancialProfile,
   type ProfileBill,
+  type VariableSpendingCategory,
 } from "@/types/profile";
 
 export const PERSONAL_ACCOUNT_ID = "acc_personal_checking";
@@ -58,8 +61,15 @@ export const PERSONAL_ACCOUNT_ID = "acc_personal_checking";
 const WEEKLY_ESTIMATE_OFFSET_DAYS = 4;
 
 export const HOUSING_BILL_ID = "profile_housing";
-export const EVERYDAY_SPENDING_BILL_ID = "profile_everyday_spending";
+export const ESSENTIAL_SPENDING_BILL_ID = "profile_essential_spending";
+export const DISCRETIONARY_SPENDING_BILL_ID = "profile_discretionary_spending";
 export const EMERGENCY_ALLOWANCE_BILL_ID = "profile_unexpected_expenses";
+
+/** Everyday spending that is hard to cut back; the rest is discretionary. */
+export const ESSENTIAL_SPENDING_CATEGORIES: readonly VariableSpendingCategory[] = [
+  "groceries",
+  "transportation",
+];
 
 interface TimelineInputs {
   bills: Bill[];
@@ -224,22 +234,43 @@ export function profileTimelineInputs(profile: FinancialProfile): TimelineInputs
   }
 
   const weeklyEstimateAnchor = addDays(referenceDate, WEEKLY_ESTIMATE_OFFSET_DAYS);
-  const monthlySpendingCents = monthlyVariableSpendingCents(
-    profile.variableSpending.amountsCents,
-    profile.variableSpending.period,
-  );
+  const { amountsCents, period } = profile.variableSpending;
+  const spendingGroups = [
+    {
+      id: ESSENTIAL_SPENDING_BILL_ID,
+      name: "Essential spending (your estimate)",
+      kind: "essential" as const,
+      includes: (category: VariableSpendingCategory) =>
+        ESSENTIAL_SPENDING_CATEGORIES.includes(category),
+    },
+    {
+      id: DISCRETIONARY_SPENDING_BILL_ID,
+      name: "Discretionary spending (your estimate)",
+      kind: "discretionary" as const,
+      includes: (category: VariableSpendingCategory) =>
+        !ESSENTIAL_SPENDING_CATEGORIES.includes(category),
+    },
+  ];
 
-  if (monthlySpendingCents > 0) {
-    bills.push({
-      ...baseBill(
-        EVERYDAY_SPENDING_BILL_ID,
-        "Everyday spending (your estimate)",
-        "Other",
-        Math.round((monthlySpendingCents * 12) / 52),
+  for (const group of spendingGroups) {
+    const monthlyCents = monthlyVariableSpendingCents(
+      Object.fromEntries(
+        VARIABLE_SPENDING_CATEGORIES.filter(group.includes).map((category) => [
+          category,
+          amountsCents[category],
+        ]),
       ),
+      period,
+    );
+
+    if (monthlyCents <= 0) continue;
+
+    bills.push({
+      ...baseBill(group.id, group.name, "Other", Math.round((monthlyCents * 12) / 52)),
       cadence: "weekly",
       anchorDate: weeklyEstimateAnchor,
       confidence: "estimated",
+      spendingKind: group.kind,
     });
   }
 
@@ -254,6 +285,7 @@ export function profileTimelineInputs(profile: FinancialProfile): TimelineInputs
       cadence: "weekly",
       anchorDate: weeklyEstimateAnchor,
       confidence: "estimated",
+      spendingKind: "unexpected",
     });
   }
 

@@ -10,12 +10,12 @@ import {
   mockIncomeSources,
   mockOneOffEvents,
 } from "@/data/mock-events";
+import { createDemoProfile, demoDataset } from "@/data/demo-profile";
 import { mockTransactions } from "@/data/mock-transactions";
-import { expandCashFlowEvents, forwardWindow, summarizeSpending } from "@/lib/calculations";
+import { summarizeSpending } from "@/lib/calculations";
 import {
   DEFAULT_PREFERENCES,
   DEMO_REFERENCE_DATE,
-  SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
   SPENDING_PERIOD_DAYS,
 } from "@/lib/constants";
 import {
@@ -26,7 +26,8 @@ import {
   transactionSchema,
   userProfileSchema,
 } from "@/lib/schemas";
-import { estimateSafeToSpend } from "@/services/safe-to-spend";
+import { createSimulationRuntime } from "@/simulation/engine";
+import { buildSimulationInput } from "@/simulation/timeline";
 import { SPENDING_CATEGORIES } from "@/types/financial";
 
 /**
@@ -232,29 +233,32 @@ describe("documented headline figures", () => {
     expect(DEFAULT_PREFERENCES.forecastHorizonDays).toBe(90);
   });
 
-  it("produces the safe-to-spend estimate quoted in the README", () => {
-    const window = forwardWindow(
-      DEMO_REFERENCE_DATE,
-      SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
-    );
-
-    const estimate = estimateSafeToSpend({
-      currentBalance: 2143,
-      minimumProtectedBalance: DEFAULT_PREFERENCES.minimumProtectedBalance,
-      reservationWindowDays: SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
-      windowEvents: expandCashFlowEvents({
-        accountId: PRIMARY_ACCOUNT_ID,
-        start: window.start,
-        end: window.end,
-        bills: mockBills,
-        incomeSources: mockIncomeSources,
-        oneOffEvents: mockOneOffEvents,
-      }),
+  it("produces the simulated figures quoted in the README", () => {
+    const input = buildSimulationInput({
+      dataset: demoDataset,
+      accountId: PRIMARY_ACCOUNT_ID,
+      protectedMinimumCents: DEFAULT_PREFERENCES.minimumProtectedBalance * 100,
+      targetConfidence: DEFAULT_PREFERENCES.targetConfidence / 100,
+      horizonDays: DEFAULT_PREFERENCES.forecastHorizonDays,
+      emergenciesEnabled: createDemoProfile(DEMO_REFERENCE_DATE).emergencies.enabled,
     });
+    const runtime = createSimulationRuntime();
+    const result = runtime.run(input);
+    const [playStation] = runtime.compare(input, [
+      {
+        id: "playstation",
+        type: "one_time_purchase",
+        amountCents: 60_000,
+        effectiveDate: DEMO_REFERENCE_DATE,
+        frequency: null,
+        description: "PlayStation",
+      },
+    ]).scenarios;
 
-    expect(estimate.reservedUpcomingBills).toBe(1126.98);
-    expect(estimate.expectedEssentialExpenses).toBe(520);
-    expect(estimate.amount).toBe(196.02);
-    expect(estimate.clamped).toBe(false);
+    expect(result.pathCount).toBe(10_000);
+    expect(result.safety.safetyProbability).toBe(0.9781);
+    expect(result.safeToSpend.amountCents).toBe(52_324);
+    expect(playStation.safety.safetyProbability).toBe(0.9438);
+    expect(playStation.meetsTarget).toBe(false);
   });
 });

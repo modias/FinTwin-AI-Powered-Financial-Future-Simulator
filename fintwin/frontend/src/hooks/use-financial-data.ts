@@ -21,7 +21,6 @@ import { SPENDING_PERIOD_DAYS } from "@/lib/constants";
 import {
   getFinancialService,
   type FinancialService,
-  type ForecastRequest,
   type SpendingRequest,
   type SummaryRequest,
   type TransactionQuery,
@@ -32,7 +31,6 @@ import type {
   Bill,
   CashFlowEvent,
   FinancialSummary,
-  ForecastSeries,
   IncomeSource,
   SpendingSummary,
   Transaction,
@@ -54,8 +52,6 @@ export const financialKeys = {
     [...financialKeys.dataset(datasetKey), "income", accountId] as const,
   events: (datasetKey: string, request: UpcomingEventsRequest) =>
     [...financialKeys.dataset(datasetKey), "events", request] as const,
-  forecast: (datasetKey: string, request: ForecastRequest) =>
-    [...financialKeys.dataset(datasetKey), "forecast", request] as const,
   summary: (datasetKey: string, request: SummaryRequest) =>
     [...financialKeys.dataset(datasetKey), "summary", request] as const,
   spending: (datasetKey: string, request: SpendingRequest) =>
@@ -186,31 +182,6 @@ export function useUpcomingEvents(
   return useQuery({
     queryKey: financialKeys.events(datasetKey, request),
     queryFn: () => requireService(service).getUpcomingCashFlowEvents(request),
-    enabled: service !== null && scope !== null,
-    placeholderData: keepPreviousWithin(datasetKey),
-  });
-}
-
-/**
- * The illustrative forecast for the selected account.
- *
- * The horizon comes from preferences, which is why the chart's 30/60/90 toggle
- * and the Settings control stay in agreement: they write the same value.
- */
-export function useForecast(): UseQueryResult<ForecastSeries> {
-  const { service, datasetKey } = useService();
-  const { preferences } = useWorkspace();
-  const scope = useAccountScope();
-  const request: ForecastRequest = {
-    accountId: scope?.accountId ?? "",
-    referenceDate: scope?.referenceDate ?? "",
-    horizonDays: preferences.forecastHorizonDays,
-    protectedBalance: preferences.minimumProtectedBalance,
-  };
-
-  return useQuery({
-    queryKey: financialKeys.forecast(datasetKey, request),
-    queryFn: () => requireService(service).getForecast(request),
     enabled: service !== null && scope !== null,
     placeholderData: keepPreviousWithin(datasetKey),
   });

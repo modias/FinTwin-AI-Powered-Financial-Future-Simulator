@@ -95,6 +95,30 @@ describe("onboarding navigation and completion", () => {
     expect(active(reload(storage))).toEqual(active(store));
   });
 
+  it("starts a new questionnaire session when one ends or is replaced", () => {
+    const { store } = setup();
+    const session = () => store.getSnapshot().draftSession;
+
+    store.startOnboarding("blank");
+    const first = session();
+
+    store.patchDraft({ balanceCents: 100 });
+    store.startOnboarding("blank");
+    expect(session()).toBe(first);
+
+    store.saveDraft(makeValidDraft());
+    store.completeOnboarding(NOW);
+    const afterCompletion = session();
+    expect(afterCompletion).not.toBe(first);
+
+    store.startOnboarding("active");
+    const editing = session();
+    expect(editing).not.toBe(afterCompletion);
+
+    store.discardDraft();
+    expect(session()).not.toBe(editing);
+  });
+
   it("sends the user back to the step that needs attention", () => {
     const { store } = setup();
 

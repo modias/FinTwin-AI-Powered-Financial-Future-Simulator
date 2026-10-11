@@ -32,6 +32,7 @@ import {
   MetricCardSkeleton,
 } from "@/components/shared/metric-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { SimulatedRisk } from "@/components/simulation/simulated-risk";
 import {
   Card,
   CardContent,
@@ -65,11 +66,11 @@ import {
 import type { CategorySpend } from "@/types/financial";
 
 /**
- * Descriptive analytics only.
+ * Forward-looking risk from the simulation, then descriptive analytics.
  *
- * Everything on this page is a measurement of transactions that already
- * happened — no projection, no probability. That keeps it honest in Phase 1 and
- * means none of it has to be revisited when the simulator arrives.
+ * The two are kept apart and labelled: the risk section is simulated; the
+ * history section is a measurement of transactions that already happened,
+ * and only exists for a profile with history.
  */
 export function InsightsView() {
   const { dataset } = useActiveWorkspace();
@@ -79,9 +80,10 @@ export function InsightsView() {
       <div className="space-y-6">
         <PageHeader
           title="Financial Insights"
-          description="Insights measure transactions that already happened, so they need history."
+          description="Simulated risk from the figures you entered. Spending analytics need transaction history."
           actions={<DataSourceBadge />}
         />
+        <SimulatedRisk />
         <NoHistoryNotice />
       </div>
     );
@@ -150,6 +152,10 @@ function HistoryInsights() {
         }
         actions={<DataSourceBadge />}
       />
+
+      <SimulatedRisk />
+
+      <h2 className="pt-2 font-heading text-base font-medium">From your transaction history</h2>
 
       {isSummaryPending || !summary || !analytics ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -419,11 +425,10 @@ function HistoryInsights() {
                 These are measurements, not predictions
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Every figure above is computed from transactions that have
-                already settled in the demonstration dataset. Forward-looking
-                analysis — risk of breaching your protected balance, confidence
-                in a spending decision — requires the simulation engine and is
-                not estimated here.
+                Every figure in this section is computed from transactions that
+                have already settled in the demonstration dataset. The risk
+                figures at the top of the page are different: they come from the
+                simulation, and they are estimates.
               </p>
             </CardContent>
           </Card>

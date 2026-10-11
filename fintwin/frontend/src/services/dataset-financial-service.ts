@@ -2,8 +2,9 @@
  * `FinancialService` over an in-memory `FinancialDataset`.
  *
  * The demo profile and a personal profile both run through this one
- * implementation: the same event expansion, the same forecast and the same
- * safe-to-spend arithmetic. Only the dataset differs.
+ * implementation, with the same event expansion. Only the dataset differs.
+ * Everything probabilistic — the forecast, safety and safe-to-spend — comes
+ * from the Monte Carlo engine (`src/simulation`), not from here.
  *
  * It behaves like a network client — async, request-parameter driven, and it
  * validates its own output against the Zod schemas in development so neither
@@ -13,40 +14,32 @@
  */
 
 import {
-  buildForecast,
   expandCashFlowEvents,
   forwardWindow,
   summarizeSpending,
   summarizeSpendingEstimates,
   sumBy,
 } from "@/lib/calculations";
-import {
-  SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
-  UPCOMING_BILLS_WINDOW_DAYS,
-} from "@/lib/constants";
+import { UPCOMING_BILLS_WINDOW_DAYS } from "@/lib/constants";
 import {
   accountSchema,
   financialSummarySchema,
-  forecastSeriesSchema,
   spendingSummarySchema,
   transactionSchema,
 } from "@/lib/schemas";
 import type {
   FinancialService,
-  ForecastRequest,
   SpendingRequest,
   SummaryRequest,
   TransactionQuery,
   UpcomingEventsRequest,
 } from "@/services/financial-service";
-import { estimateSafeToSpend } from "@/services/safe-to-spend";
 import type {
   Account,
   Bill,
   CashFlowEvent,
   FinancialDataset,
   FinancialSummary,
-  ForecastSeries,
   IncomeSource,
   SpendingSummary,
   Transaction,
@@ -197,49 +190,14 @@ export function createFinancialService(dataset: FinancialDataset): FinancialServ
       return delay(typeof limit === "number" ? events.slice(0, limit) : events);
     },
 
-    getForecast({
-      accountId,
-      referenceDate,
-      horizonDays,
-      protectedBalance,
-    }: ForecastRequest): Promise<ForecastSeries> {
-      const account = accountOrThrow(accountId);
-      const { start, end } = forwardWindow(referenceDate, horizonDays);
-
-      const series = buildForecast({
-        accountId,
-        startDate: referenceDate,
-        startingBalance: account.currentBalance,
-        protectedBalance,
-        horizonDays,
-        events: eventsForWindow(accountId, start, end),
-      });
-
-      return delay(assertShape(forecastSeriesSchema, series, "forecast"));
-    },
-
     getFinancialSummary({
       accountId,
       referenceDate,
       protectedBalance,
     }: SummaryRequest): Promise<FinancialSummary> {
       const account = accountOrThrow(accountId);
-
-      const reservationWindow = forwardWindow(
-        referenceDate,
-        SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
-      );
-      const reservationEvents = eventsForWindow(
-        accountId,
-        reservationWindow.start,
-        reservationWindow.end,
-      );
-
       const billsWindow = forwardWindow(referenceDate, UPCOMING_BILLS_WINDOW_DAYS);
-      const billsWindowEvents =
-        UPCOMING_BILLS_WINDOW_DAYS === SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS
-          ? reservationEvents
-          : eventsForWindow(accountId, billsWindow.start, billsWindow.end);
+      const billsWindowEvents = eventsForWindow(accountId, billsWindow.start, billsWindow.end);
 
       const upcomingBills = billsWindowEvents.filter(
         (event) => event.direction === "expense" && event.confidence === "scheduled",
@@ -259,15 +217,6 @@ export function createFinancialService(dataset: FinancialDataset): FinancialServ
         expectedIncomeTotal: sumBy(upcomingIncome, (event) => event.amount),
         nextIncomeDate: upcomingIncome[0]?.date ?? null,
         nextIncomeAmount: upcomingIncome[0]?.amount ?? null,
-        safeToSpend: estimateSafeToSpend({
-          currentBalance: account.currentBalance,
-          minimumProtectedBalance: protectedBalance,
-          windowEvents: reservationEvents,
-          reservationWindowDays: SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS,
-        }),
-        // There is no simulation engine yet, so the dashboard shows this status
-        // instead of inventing a safety probability.
-        simulationStatus: "unavailable",
       };
 
       return delay(assertShape(financialSummarySchema, summary, "financialSummary"));

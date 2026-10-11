@@ -87,11 +87,6 @@ export function SidebarNav({
                   )}
                 />
                 <span className="flex-1 truncate">{item.label}</span>
-                {item.isPreview ? (
-                  <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-primary">
-                    Soon
-                  </span>
-                ) : null}
               </Link>
             </li>
           );

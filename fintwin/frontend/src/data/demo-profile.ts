@@ -10,8 +10,8 @@
  * Checking account (the test suite checks that they agree), so opening the
  * demo answers in the questionnaire shows figures consistent with the demo
  * dashboard. Everyday spending covers what the mock dataset forecasts —
- * groceries and fuel — and unexpected expenses are off because the mock
- * dataset does not model them.
+ * groceries and fuel. Unexpected expenses are on: the simulation draws them
+ * from its stated assumptions, not from the dataset.
  */
 
 import { PRIMARY_ACCOUNT_ID, mockAccounts, mockUserProfile } from "@/data/mock-accounts";
@@ -98,7 +98,7 @@ export function createDemoProfile(now: string): FinancialProfile {
         other: 0,
       },
     },
-    emergencies: { enabled: false },
+    emergencies: { enabled: true },
     preferences: {
       protectedMinimumCents: dollarsToCents(DEFAULT_PREFERENCES.minimumProtectedBalance),
       targetConfidence: 0.95,

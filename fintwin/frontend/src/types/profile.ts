@@ -63,7 +63,7 @@ export type VariableSpendingCategory =
 
 export type SpendingPeriod = "weekly" | "monthly";
 
-/** Target probabilities for the Phase 2 simulation, as fractions. */
+/** Safety targets for the simulation, as fractions. */
 export const PROFILE_CONFIDENCES = [0.9, 0.95, 0.99] as const;
 
 export type ProfileConfidence = (typeof PROFILE_CONFIDENCES)[number];

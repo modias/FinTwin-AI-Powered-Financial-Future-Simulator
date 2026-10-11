@@ -32,13 +32,6 @@ export const THEME_PREFERENCES = [
 
 export const DEFAULT_THEME: ThemePreference = "light";
 
-/**
- * Number of days of upcoming obligations the illustrative safe-to-spend
- * estimate sets aside. Phase 2 replaces the whole estimate, so this lives with
- * the other demo constants rather than in user preferences.
- */
-export const SAFE_TO_SPEND_RESERVATION_WINDOW_DAYS = 30;
-
 /** Window used by the "Upcoming Bills" summary card. */
 export const UPCOMING_BILLS_WINDOW_DAYS = 30;
 
@@ -71,29 +64,18 @@ export const LEGACY_PREFERENCES_STORAGE_KEY = "fintwin.preferences.v1";
 export const MAX_AMOUNT_CENTS = 1_000_000_000;
 
 /**
- * The allowance for unplanned costs a profile includes when the user says yes
- * to "include unexpected expenses". Shown verbatim on the onboarding screen so
- * the assumption is never hidden.
+ * Unexpected expenses, when the user says yes to including them. Shown
+ * verbatim on the onboarding screen so the assumption is never hidden.
  *
  * Three $600 surprises a year is a deliberately round planning figure, not a
- * statistic about the user. It is spread evenly as a weekly estimated expense
- * because the profile does not ask when emergencies happen.
+ * statistic about the user. The profile timeline spreads it evenly as a
+ * weekly allowance (the expected cost); the simulation instead draws random
+ * surprises at this rate and size, and drops the allowance so they are never
+ * counted twice.
  */
 export const EMERGENCY_ASSUMPTIONS = {
   averageCostCents: 60_000,
   eventsPerYear: 3,
-} as const;
-
-/**
- * Variability the Phase 2 simulation will assume for a profile that has no
- * transaction history to learn from. Disclosed on the dashboard wherever the
- * simulation is mentioned for such a profile.
- */
-export const FALLBACK_VOLATILITY = {
-  /** Standard deviation of everyday spending as a share of the estimate. */
-  everydaySpendingVariation: 0.25,
-  /** Chance a scheduled paycheck lands a day or more late. */
-  incomeDelayProbability: 0.05,
 } as const;
 
 export const DATA_MODE = (process.env.NEXT_PUBLIC_DATA_MODE ?? "mock") as

@@ -68,6 +68,27 @@ export function formatPercent(value: number, fractionDigits = 1): string {
   return `${value.toFixed(fractionDigits)}%`;
 }
 
+/**
+ * A probability given as a fraction, as `95.3%`. Never rounds to a certainty
+ * the simulation didn't show: 9,999 safe paths out of 10,000 reads `>99.9%`,
+ * not `100.0%`, and a single breach reads `<0.1%`, not `0.0%`.
+ */
+export function formatProbability(probability: number): string {
+  if (probability > 0.999 && probability < 1) return ">99.9%";
+  if (probability > 0 && probability < 0.001) return "<0.1%";
+
+  return `${(probability * 100).toFixed(1)}%`;
+}
+
+/** A change in percentage points: `+2.4 pts`, `−11.0 pts`, `No change`. */
+export function formatPointChange(points: number): string {
+  const rounded = Math.round(points * 10) / 10;
+
+  if (rounded === 0) return points === 0 ? "No change" : points > 0 ? "+<0.1 pts" : "\u2212<0.1 pts";
+
+  return `${rounded > 0 ? "+" : "\u2212"}${Math.abs(rounded).toFixed(1)} pts`;
+}
+
 /** `Everyday Checking •••• 4821`, or just the name for an account without a mask. */
 export function formatAccountLabel(name: string, mask: string | null): string {
   return mask ? `${name} •••• ${mask}` : name;

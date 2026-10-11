@@ -2,13 +2,12 @@
  * Pure financial calculations.
  *
  * Nothing here touches React, the network or the clock — every function is a
- * deterministic transform of its inputs, which is what makes the Phase 1
- * forecast reproducible and the unit tests meaningful.
+ * deterministic transform of its inputs, which is what keeps the unit tests
+ * meaningful.
  *
- * Phase 2 note: the Monte Carlo engine will replace `buildForecast` with a
- * percentile-band generator and `estimateSafeToSpend` (in
- * `services/safe-to-spend.ts`) with a probabilistic optimizer. The signatures
- * here are the seam those replacements plug into.
+ * `expandCashFlowEvents` produces the canonical cash-flow timeline. The Monte
+ * Carlo engine in `src/simulation` builds every simulated path from it, and
+ * the upcoming-events list shows the same events, so there is one timeline.
  */
 
 import { addDays, differenceInDays, occurrencesBetween } from "@/lib/dates";
@@ -17,8 +16,6 @@ import {
   type Bill,
   type CashFlowEvent,
   type CategorySpend,
-  type ForecastPoint,
-  type ForecastSeries,
   type IncomeSource,
   type SpendingCategory,
   type SpendingEstimate,
@@ -92,6 +89,7 @@ export function expandCashFlowEvents({
         direction: "expense",
         confidence: bill.confidence,
         sourceId: bill.id,
+        ...(bill.spendingKind ? { spendingKind: bill.spendingKind } : {}),
       });
     }
   }
@@ -134,103 +132,6 @@ function compareEvents(a: CashFlowEvent, b: CashFlowEvent): number {
   if (a.direction !== b.direction) return a.direction === "income" ? -1 : 1;
 
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
-interface BuildForecastOptions {
-  accountId: string;
-  startDate: string;
-  startingBalance: number;
-  protectedBalance: number;
-  horizonDays: number;
-  events: readonly CashFlowEvent[];
-}
-
-/**
- * Walks the balance forward one day at a time, applying every event on its
- * date. Produces `horizonDays + 1` points so the series includes today.
- *
- * This is an illustrative deterministic projection, not a simulation: a single
- * path with no variance. `method` records that on the result.
- */
-export function buildForecast({
-  accountId,
-  startDate,
-  startingBalance,
-  protectedBalance,
-  horizonDays,
-  events,
-}: BuildForecastOptions): ForecastSeries {
-  const eventsByDate = new Map<string, CashFlowEvent[]>();
-
-  for (const event of events) {
-    const bucket = eventsByDate.get(event.date);
-
-    if (bucket) {
-      bucket.push(event);
-    } else {
-      eventsByDate.set(event.date, [event]);
-    }
-  }
-
-  const points: ForecastPoint[] = [];
-  let balance = startingBalance;
-  let lowestProjectedBalance = startingBalance;
-  let lowestProjectedBalanceDate = startDate;
-  let daysBelowProtectedBalance = 0;
-
-  for (let dayIndex = 0; dayIndex <= horizonDays; dayIndex += 1) {
-    const date = addDays(startDate, dayIndex);
-    const dayEvents = eventsByDate.get(date) ?? [];
-
-    let income = 0;
-    let bills = 0;
-    let estimatedSpending = 0;
-
-    for (const event of dayEvents) {
-      if (event.direction === "income") {
-        income += event.amount;
-      } else if (event.confidence === "scheduled") {
-        bills += event.amount;
-      } else {
-        estimatedSpending += event.amount;
-      }
-    }
-
-    balance = roundMoney(balance + income - bills - estimatedSpending);
-
-    if (balance < lowestProjectedBalance) {
-      lowestProjectedBalance = balance;
-      lowestProjectedBalanceDate = date;
-    }
-
-    if (balance < protectedBalance) {
-      daysBelowProtectedBalance += 1;
-    }
-
-    points.push({
-      date,
-      dayIndex,
-      projectedBalance: balance,
-      income: roundMoney(income),
-      bills: roundMoney(bills),
-      estimatedSpending: roundMoney(estimatedSpending),
-      protectedBalance,
-    });
-  }
-
-  return {
-    accountId,
-    horizonDays,
-    startDate,
-    startingBalance,
-    protectedBalance,
-    points,
-    endingBalance: points[points.length - 1].projectedBalance,
-    lowestProjectedBalance,
-    lowestProjectedBalanceDate,
-    daysBelowProtectedBalance,
-    method: "deterministic-illustrative",
-  };
 }
 
 function isSpendingCategory(category: string): category is SpendingCategory {
@@ -531,14 +432,4 @@ export function weeklySpending(
   }
 
   return buckets.reverse();
-}
-
-/** Convenience wrapper used by the forecast chart's horizon filter. */
-export function pointsWithinHorizon(
-  series: ForecastSeries,
-  horizonDays: number,
-): ForecastPoint[] {
-  return series.points.filter(
-    (point) => differenceInDays(series.startDate, point.date) <= horizonDays,
-  );
 }

@@ -59,6 +59,15 @@ export type EventConfidence = "scheduled" | "estimated";
 
 export type CashFlowDirection = "income" | "expense";
 
+/**
+ * What an `estimated` expense represents to the simulation. Essential and
+ * discretionary spending vary by different amounts; `unexpected` is the
+ * planning allowance for emergencies, which the simulation replaces with
+ * randomly drawn emergencies rather than counting both. When absent, the kind
+ * follows from the category (see `spendingKindOf` in `src/simulation`).
+ */
+export type SpendingKind = "essential" | "discretionary" | "unexpected";
+
 export interface Account {
   id: string;
   name: string;
@@ -102,6 +111,7 @@ export interface Bill {
   anchorDate: string;
   confidence: EventConfidence;
   autoPay: boolean;
+  spendingKind?: SpendingKind;
 }
 
 export interface IncomeSource {
@@ -130,71 +140,8 @@ export interface CashFlowEvent {
   confidence: EventConfidence;
   /** The `Bill` or `IncomeSource` this occurrence was generated from. */
   sourceId: string;
-}
-
-export interface ForecastPoint {
-  /** ISO calendar date, `YYYY-MM-DD`. */
-  date: string;
-  /** Days from the forecast start; `0` is the reference date. */
-  dayIndex: number;
-  projectedBalance: number;
-  /** Income arriving on this date, `0` when none. */
-  income: number;
-  /** Scheduled bills due on this date, `0` when none. */
-  bills: number;
-  /** Estimated everyday spending on this date, `0` when none. */
-  estimatedSpending: number;
-  /** Repeated on every point so the chart can draw a flat threshold line. */
-  protectedBalance: number;
-}
-
-export interface ForecastSeries {
-  accountId: string;
-  horizonDays: number;
-  /** Date the walk starts from, `YYYY-MM-DD`. */
-  startDate: string;
-  startingBalance: number;
-  protectedBalance: number;
-  points: ForecastPoint[];
-  endingBalance: number;
-  lowestProjectedBalance: number;
-  lowestProjectedBalanceDate: string;
-  /** Number of days the projection sits below the protected balance. */
-  daysBelowProtectedBalance: number;
-  /**
-   * Phase 1 forecasts are a deterministic walk over mock events, not a
-   * probabilistic simulation. Carried on the payload so the UI can label it.
-   */
-  method: "deterministic-illustrative";
-}
-
-export interface SafeToSpendLine {
-  label: string;
-  description: string;
-  amount: number;
-  /** `add` lines increase the estimate, `subtract` lines reduce it. */
-  effect: "add" | "subtract";
-}
-
-export interface SafeToSpendEstimate {
-  /** Clamped to a minimum of 0. */
-  amount: number;
-  /** True when the clamp changed the result, i.e. the raw estimate was negative. */
-  clamped: boolean;
-  /** The value before clamping, useful for explaining a $0 result. */
-  rawAmount: number;
-  currentBalance: number;
-  reservedUpcomingBills: number;
-  expectedEssentialExpenses: number;
-  minimumProtectedBalance: number;
-  /** Days of upcoming obligations the estimate reserves for. */
-  reservationWindowDays: number;
-  breakdown: SafeToSpendLine[];
-  /**
-   * Phase 1 uses a transparent subtraction, not the Phase 2 Monte Carlo
-   * optimizer. The UI relies on this to label the figure honestly.
-   */
-  method: "illustrative-placeholder";
+  /** Carried over from the `Bill`, for estimated expenses. */
+  spendingKind?: SpendingKind;
 }
 
 export interface CategorySpend {
@@ -227,9 +174,11 @@ export interface SpendingSummary {
   transactionCount: number;
 }
 
-/** Status of the Phase 2 Monte Carlo engine, surfaced instead of a fake number. */
-export type SimulationStatus = "unavailable";
-
+/**
+ * Deterministic facts about the account: its balance and what is scheduled.
+ * Safe-to-spend and every probability come from the Monte Carlo engine in
+ * `src/simulation`, not from this summary.
+ */
 export interface FinancialSummary {
   accountId: string;
   /** Demo reference date the whole summary was computed against. */
@@ -243,8 +192,6 @@ export interface FinancialSummary {
   expectedIncomeTotal: number;
   nextIncomeDate: string | null;
   nextIncomeAmount: number | null;
-  safeToSpend: SafeToSpendEstimate;
-  simulationStatus: SimulationStatus;
 }
 
 /**
@@ -267,10 +214,7 @@ export type ThemePreference = "dark" | "light" | "system";
 
 export interface UserPreferences {
   minimumProtectedBalance: number;
-  /**
-   * Stored for the Phase 2 simulator. It does not affect the Phase 1
-   * illustrative estimate and the UI says so.
-   */
+  /** Share of simulated paths that must stay above the minimum, in percent. */
   targetConfidence: TargetConfidence;
   forecastHorizonDays: ForecastHorizon;
   theme: ThemePreference;

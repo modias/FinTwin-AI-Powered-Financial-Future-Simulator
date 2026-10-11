@@ -102,9 +102,9 @@ export function SafetyStep({ draft, update, errors }: StepProps) {
           ))}
         </RadioGroup>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          The simulation that uses this isn&rsquo;t available yet. Until it is,
-          FinTwin shows a simple illustrative estimate and never presents it as
-          a probability.
+          FinTwin simulates thousands of possible futures and calls an amount
+          safe only if at least this share of them stay above your minimum. It
+          is a target for the model, not a guarantee.
         </p>
       </Question>
 

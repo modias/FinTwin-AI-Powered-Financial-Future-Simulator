@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { SimulatorPreview } from "./simulator-preview";
+import { SimulatorView } from "./simulator-view";
 
 // Rendered from the profile in this browser; see `(app)/layout.tsx`.
 export const instant = false;
@@ -8,9 +8,9 @@ export const instant = false;
 export const metadata: Metadata = {
   title: "Future Simulator",
   description:
-    "Monte Carlo simulation of your future bank balance. Arriving in Phase 2.",
+    "Test a purchase or change against thousands of simulated futures for your bank balance.",
 };
 
 export default function SimulatorPage() {
-  return <SimulatorPreview />;
+  return <SimulatorView />;
 }

@@ -74,15 +74,21 @@ function focusFirstError(errors: FieldErrors) {
  */
 export function OnboardingWizard() {
   const router = useRouter();
-  const { isHydrated, draft: savedDraft, patchDraft } = useWorkspace();
+  const { isHydrated, draft: savedDraft, draftSession, patchDraft } = useWorkspace();
   const today = useToday();
   const emptyDraft = useMemo(() => createEmptyDraft(), []);
   const draft = savedDraft ?? emptyDraft;
   const step = Math.min(draft.step, LAST_STEP);
 
   // Errors appear only after the user tries to continue from a step, then
-  // update live as they fix them.
-  const [attempted, setAttempted] = useState<ReadonlySet<number>>(new Set());
+  // update live as they fix them. Attempts from an earlier questionnaire don't
+  // count.
+  const [attempts, setAttempts] = useState<{
+    session: number;
+    steps: ReadonlySet<number>;
+  }>({ session: draftSession, steps: new Set() });
+  const attempted =
+    attempts.session === draftSession ? attempts.steps : new Set<number>();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
 
@@ -107,7 +113,7 @@ export function OnboardingWizard() {
     const stepErrors = validateStep(draft, step, today as string);
 
     if (hasErrors(stepErrors)) {
-      setAttempted((current) => new Set(current).add(step));
+      setAttempts({ session: draftSession, steps: new Set(attempted).add(step) });
       focusFirstError(stepErrors);
       return;
     }

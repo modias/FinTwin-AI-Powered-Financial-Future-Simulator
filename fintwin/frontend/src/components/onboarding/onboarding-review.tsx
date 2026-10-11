@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   CircleAlert,
+  CircleCheck,
   ClipboardList,
   Info,
   Pencil,
@@ -89,16 +90,31 @@ function budgetInputs(draft: OnboardingDraft) {
 
 export function OnboardingReview() {
   const router = useRouter();
-  const { isHydrated, draft, saveDraft, completeOnboarding, discardDraft } =
+  const { isHydrated, draft, activeProfile, saveDraft, completeOnboarding, discardDraft } =
     useWorkspace();
   const today = useToday();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isHydrated || !today || isSubmitting) {
-    return <ReviewSkeleton label={isSubmitting ? "Creating your financial twin…" : undefined} />;
+  if (!isHydrated || !today) {
+    return <ReviewSkeleton />;
   }
 
   if (!draft) {
+    // Also shows briefly after saving, on the way to the dashboard.
+    if (activeProfile?.source === "user_entered") {
+      return (
+        <EmptyState
+          icon={CircleCheck}
+          title="Your financial twin is up to date"
+          description="The dashboard uses the answers you saved. You can change them anytime from Settings."
+          action={
+            <Button asChild>
+              <Link href="/overview">Go to dashboard</Link>
+            </Button>
+          }
+        />
+      );
+    }
+
     return (
       <EmptyState
         icon={ClipboardList}
@@ -131,11 +147,10 @@ export function OnboardingReview() {
       return;
     }
 
-    setIsSubmitting(true);
     toast.success(isEditing ? "Your financial twin is updated" : "Your financial twin is ready", {
       description: "The dashboard now uses the answers you entered.",
     });
-    router.push("/overview");
+    router.replace("/overview");
   }
 
   return (
@@ -276,7 +291,7 @@ export function OnboardingReview() {
           value={`${confidenceLabels[draft.targetConfidence].title} · ${Math.round(
             draft.targetConfidence * 100,
           )}%`}
-          detail="A target for the future simulation, not a guarantee."
+          detail="A target for the simulation, not a guarantee."
         />
         <Row label="Forecast horizon" value={`${draft.horizonDays} days`} />
       </ReviewSection>
@@ -470,10 +485,9 @@ function Row({ label, value, detail }: { label: string; value: string; detail?: 
   );
 }
 
-function ReviewSkeleton({ label }: { label?: string }) {
+function ReviewSkeleton() {
   return (
     <div className="space-y-6" aria-busy role="status">
-      {label ? <p className="text-sm text-muted-foreground">{label}</p> : null}
       <Skeleton className="h-56 w-full rounded-xl" />
       <Skeleton className="h-40 w-full rounded-xl" />
       <Skeleton className="h-40 w-full rounded-xl" />

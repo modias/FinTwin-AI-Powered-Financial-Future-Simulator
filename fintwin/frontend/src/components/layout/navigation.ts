@@ -14,8 +14,6 @@ export interface NavItem {
   icon: LucideIcon;
   /** Short description used by the mobile drawer. */
   description: string;
-  /** True for pages that are previews of later-phase functionality. */
-  isPreview?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -29,21 +27,19 @@ export const navItems: NavItem[] = [
     label: "Future Simulator",
     href: "/simulator",
     icon: TrendingUp,
-    description: "Monte Carlo simulation, coming in Phase 2",
-    isPreview: true,
+    description: "Test a purchase against simulated futures",
   },
   {
     label: "Scenario Lab",
     href: "/scenarios",
     icon: FlaskConical,
-    description: "Compare financial decisions side by side",
-    isPreview: true,
+    description: "Compare up to three decisions side by side",
   },
   {
     label: "Financial Insights",
     href: "/insights",
     icon: Lightbulb,
-    description: "Descriptive analytics from your transactions",
+    description: "Simulated risk and spending analytics",
   },
   {
     label: "Transaction History",
@@ -55,7 +51,7 @@ export const navItems: NavItem[] = [
     label: "Settings",
     href: "/settings",
     icon: Settings,
-    description: "Protected balance, horizon and theme",
+    description: "Protected minimum, safety target and horizon",
   },
 ];
 

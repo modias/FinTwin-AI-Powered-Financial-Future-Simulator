@@ -21,7 +21,6 @@ import type {
   CashFlowEvent,
   FinancialDataset,
   FinancialSummary,
-  ForecastSeries,
   IncomeSource,
   SpendingSummary,
   Transaction,
@@ -41,11 +40,6 @@ export interface AccountScopedRequest {
   accountId: string;
   /** The dataset's reference date, which every forward-looking figure starts from. */
   referenceDate: string;
-}
-
-export interface ForecastRequest extends AccountScopedRequest {
-  horizonDays: number;
-  protectedBalance: number;
 }
 
 export interface SummaryRequest extends AccountScopedRequest {
@@ -75,7 +69,6 @@ export interface FinancialService {
   getUpcomingCashFlowEvents(
     request: UpcomingEventsRequest,
   ): Promise<CashFlowEvent[]>;
-  getForecast(request: ForecastRequest): Promise<ForecastSeries>;
   getFinancialSummary(request: SummaryRequest): Promise<FinancialSummary>;
   getSpendingSummary(request: SpendingRequest): Promise<SpendingSummary>;
 }

@@ -1,43 +1,26 @@
 "use client";
 
-import { CalendarClock, Shield, Waypoints, Wallet } from "lucide-react";
+import { ArrowDownRight, CalendarClock, ShieldCheck, TriangleAlert } from "lucide-react";
 
-import { PhaseBadge } from "@/components/shared/disclosure-badges";
-import {
-  MetricCard,
-  MetricCardSkeleton,
-} from "@/components/shared/metric-card";
-import { useFinancialSummary, useSelectedAccount } from "@/hooks/use-financial-data";
-import { useSimulationConfig } from "@/hooks/use-simulation-config";
+import { SourceTag } from "@/components/shared/disclosure-badges";
+import { MetricCard, MetricCardSkeleton } from "@/components/shared/metric-card";
+import { useFinancialSummary } from "@/hooks/use-financial-data";
+import { useSimulation } from "@/hooks/use-simulation";
 import { formatMediumDate } from "@/lib/dates";
-import { formatAccountLabel, formatCurrency, formatPercent } from "@/lib/formatters";
-import type { VolatilitySource } from "@/services/simulation";
+import { formatCurrency, formatProbability } from "@/lib/formatters";
+import { formatCents } from "@/lib/money";
 
-function simulationHint(volatility: VolatilitySource): string {
-  const base =
-    "A probability of staying above your protected balance needs the Monte Carlo engine. FinTwin will not estimate one without it.";
-
-  if (volatility.kind === "transaction_history") return base;
-
-  return `${base} With no transaction history, it will start from default assumptions: everyday spending varying by about ${formatPercent(
-    volatility.everydaySpendingVariation * 100,
-    0,
-  )} and a ${formatPercent(volatility.incomeDelayProbability * 100, 0)} chance of a late paycheck.`;
-}
+const pathCountFormatter = new Intl.NumberFormat("en-US");
 
 /**
- * The four headline figures under the hero card.
- *
- * The fourth, Financial Safety, is where a probability would go once the Monte
- * Carlo engine exists. Until then it reports its own absence rather than
- * showing a number nothing computed.
+ * Headline figures under the hero card: three from the simulation and one
+ * from the schedule, each labelled with where it comes from.
  */
 export function FinancialSummaryCards() {
-  const { data: summary, isPending } = useFinancialSummary();
-  const account = useSelectedAccount();
-  const simulationConfig = useSimulationConfig();
+  const { data: result } = useSimulation();
+  const { data: summary } = useFinancialSummary();
 
-  if (isPending || !summary) {
+  if (!result || !summary) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
@@ -47,26 +30,50 @@ export function FinancialSummaryCards() {
     );
   }
 
+  const { safety, risk } = result;
+  const target = Math.round(result.targetConfidence * 100);
+  const meetsTarget = safety.safePaths >= result.safeToSpend.requiredSafePaths;
+  const paths = pathCountFormatter.format(result.pathCount);
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
-        label="Current balance"
-        value={formatCurrency(summary.currentBalance)}
-        hint={
-          account
-            ? `${formatAccountLabel(account.name, account.mask)} · ${account.institution}`
-            : undefined
-        }
-        icon={Wallet}
-        tone="accent"
+        label="Financial safety"
+        value={formatProbability(safety.safetyProbability)}
+        hint={`Simulated futures that never drop below ${formatCents(
+          result.protectedMinimumCents,
+        )} in the next ${result.horizonDays} days. ${
+          meetsTarget ? "Meets" : "Below"
+        } your ${target}% target.`}
+        icon={ShieldCheck}
+        tone={meetsTarget ? "positive" : "risk"}
+        badge={<SourceTag source="simulated" />}
       />
 
       <MetricCard
-        label="Protected minimum balance"
-        value={formatCurrency(summary.protectedMinimumBalance)}
-        hint="The floor FinTwin keeps out of every spending estimate. Adjustable in Settings."
-        icon={Shield}
-        tone="positive"
+        label="Chance of dipping below your minimum"
+        value={formatProbability(safety.breachProbability)}
+        hint={
+          risk.medianFirstBreach
+            ? `Of ${paths} simulations. When it happens, typically first around ${formatMediumDate(
+                risk.medianFirstBreach.date,
+              )}.`
+            : `None of the ${paths} simulations dipped below it.`
+        }
+        icon={TriangleAlert}
+        tone={safety.breachProbability > 1 - result.targetConfidence ? "risk" : "neutral"}
+        badge={<SourceTag source="simulated" />}
+      />
+
+      <MetricCard
+        label="Lowest balance, bad case"
+        value={formatCents(risk.minimumBalanceP5Cents)}
+        hint={`In the worst 5% of simulations, the balance falls to this or lower at some point. Median low point: ${formatCents(
+          risk.medianMinimumBalanceCents,
+        )}.`}
+        icon={ArrowDownRight}
+        tone={risk.minimumBalanceP5Cents < result.protectedMinimumCents ? "warning" : "neutral"}
+        badge={<SourceTag source="simulated" />}
       />
 
       <MetricCard
@@ -75,22 +82,11 @@ export function FinancialSummaryCards() {
         hint={`${summary.upcomingBillsCount} scheduled ${
           summary.upcomingBillsCount === 1 ? "bill" : "bills"
         } in the next ${summary.upcomingWindowDays} days${
-          summary.nextIncomeDate
-            ? ` · next income ${formatMediumDate(summary.nextIncomeDate)}`
-            : ""
+          summary.nextIncomeDate ? ` · next income ${formatMediumDate(summary.nextIncomeDate)}` : ""
         }`}
         icon={CalendarClock}
         tone="warning"
-      />
-
-      <MetricCard
-        label="Financial safety"
-        value="Simulation not yet available"
-        hint={simulationHint(simulationConfig.volatility)}
-        icon={Waypoints}
-        tone="neutral"
-        isMuted
-        badge={<PhaseBadge />}
+        badge={<SourceTag source="scheduled" />}
       />
     </div>
   );

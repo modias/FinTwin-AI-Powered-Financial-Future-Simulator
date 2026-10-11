@@ -1,4 +1,4 @@
-# FinTwin — Frontend (Phase 1)
+# FinTwin — Frontend
 
 > Your financial future, before it happens.
 
@@ -8,10 +8,15 @@ question:
 
 **How much can I safely spend today while protecting my minimum bank balance?**
 
-This directory contains **Phase 1**: the complete, runnable frontend. It runs
-with no backend, no API keys and no bank connection. The dashboard is driven
-either by **your own answers** to a short onboarding questionnaire or by a
-typed **demonstration dataset**.
+This directory is the complete, runnable application, including a
+**Monte Carlo simulation engine written in TypeScript** that runs in a Web
+Worker in the browser. It needs no backend, no API keys and no bank
+connection. The dashboard is driven either by **your own answers** to a short
+onboarding questionnaire or by a typed **demonstration dataset**.
+
+> FinTwin uses simulated financial outcomes based on your financial profile and
+> modeling assumptions. These results are estimates, not guarantees or
+> personalized financial advice.
 
 ## Quick start
 
@@ -49,88 +54,185 @@ cp .env.example .env.local
 | `npm run typecheck` | `tsc --noEmit`                                |
 | `npm run lint`      | ESLint                                        |
 
-## What is real and what is a placeholder
+## What works
 
-Phase 1 is a real application on data you type in or on demonstration data.
-The distinction matters, so the interface states which one you are looking at
-everywhere rather than burying it here.
-
-**Fully working**
+Everything in the interface is real: on data you type in, or on
+demonstration data. The interface says which one you are looking at on every
+screen, and labels every figure by where it came from: **user-entered**,
+**historical**, **scheduled**, **estimated**, **simulated** or
+**hypothetical**.
 
 - The welcome screen at `/`, which leads into onboarding or the demo.
 - Financial onboarding: four validated steps, a review screen, editing from
   Settings, resume after refresh, switching between your profile and the demo,
   and reset (see [Onboarding and personal profiles](#onboarding-and-personal-profiles)).
-- Sidebar and mobile drawer navigation; every link resolves.
-- Account switching, which rescopes the summary, forecast, events, spending
-  breakdown and transaction list together.
-- Forecast horizon switching (30/60/90), interactive chart tooltips, the
-  spending donut and the insights charts.
-- Transaction search and category filtering.
-- Settings, persisted to `localStorage`, applied to the dashboard immediately.
-- Light (default), dark and system themes.
+- **Overview**: a simulated Safe-to-Spend amount, the chance of staying above
+  your protected minimum, a bad-case low balance, and a forecast chart with
+  daily 10th/50th/90th percentile bands at 30, 60 or 90 days.
+- **Future Simulator**: describe a purchase or another change and see your
+  risk before and after, on the same simulated futures.
+- **Scenario Lab**: compare up to three options side by side.
+- **Financial Insights**: simulated risk metrics and what drives them, plus
+  descriptive analytics from transaction history (demo only).
+- **Settings**: protected minimum, safety target, horizon and unexpected
+  expenses; every change re-runs the simulation, and no result is shown next to
+  inputs it was not computed from.
+- Account switching, transaction search and filtering, light (default), dark
+  and system themes.
 
-**Deliberately absent**
+**Deliberately absent:** authentication, payments, and the Nessie / FastAPI /
+Gemini integrations. No request leaves the browser.
 
-- **The Monte Carlo engine.** The Financial Safety card reads
-  _"Simulation not yet available"_ instead of showing a probability, and the
-  Future Simulator and Scenario Lab pages are previews with inert inputs and no
-  results.
-- **A probabilistic safe-to-spend amount.** Phase 1 shows a transparent
-  subtraction, labelled as an illustrative estimate (see below).
-- **Percentile bands on the forecast.** One deterministic path has no
-  distribution to draw.
-- Authentication, payments, and the Nessie / FastAPI / Gemini integrations.
+The rule applied throughout: **never a fabricated result.** No figure is a
+placeholder, no chart value is random per render, and nothing in the UI is a
+decorative control that looks functional and does nothing.
 
-The rule applied throughout: **show the shape of what is coming, never a
-fabricated result.** Nothing in the UI is a decorative control that looks
-functional and does nothing.
+## The Monte Carlo engine
 
-## The illustrative safe-to-spend estimate
+The engine lives in `src/simulation/`. It is plain TypeScript: no React, no
+clock, no network. It runs in a Web Worker (`src/workers/simulation.worker.ts`)
+so 10,000 paths never block the page.
 
-The headline figure on the Overview dashboard comes from
-`src/services/safe-to-spend.ts`:
+### What a path is
+
+The opening balance is the account's balance on the reference date. It
+already reflects every past transaction: history is **never** replayed into
+it, only used to measure how spending varies. From there each path walks the
+horizon day by day, and every day happens in this order:
+
+1. start from the previous closing balance;
+2. add scheduled income;
+3. subtract scheduled bills;
+4. subtract the path's sampled variable spending;
+5. subtract the path's sampled unexpected expenses;
+6. apply hypothetical scenario changes (what-ifs only);
+7. check the protected minimum;
+8. record the closing balance.
+
+All money is **integer cents** and all dates are `YYYY-MM-DD`. Every event on
+the timeline comes from one expansion of the profile (or demo dataset), so
+nothing is counted twice.
+
+**A path is safe only if it never falls below the protected minimum on any
+day**, including day 0 after a purchase made today. A path that dips below
+and recovers is still unsafe.
 
 ```text
-estimate = current balance
-         − scheduled bills in the next 30 days
-         − estimated spending in the next 30 days
-         − minimum protected balance
+safety probability = safe paths / total paths
+breach probability = 1 − safety probability
 ```
 
-For a personal profile, "estimated spending" is the everyday spending and the
-unexpected-expense allowance from the questionnaire. For the demo it is the
-dataset's estimated groceries and fuel.
+### What is fixed and what is random
 
-clamped to a minimum of `$0`.
+| On every path | Varies by path |
+| ------------- | -------------- |
+| Opening balance, income on its dates, scheduled bills (rent, utilities, subscriptions…), expected one-off payments | Everyday spending, unexpected expenses |
 
-With the default settings and the primary demo account this evaluates to:
+Scheduled bills are **not** randomised: a $850 rent payment is $850 on every
+path.
 
-```text
-$2,143.00  current balance
-− $1,126.98  scheduled bills   (utilities, internet, Netflix, gym, rent, Spotify, phone)
-−   $520.00  estimated spending (groceries ×2, fuel ×2)
-−   $300.00  protected minimum balance
-= $196.02
-```
+**Everyday spending** is split into **essential** (groceries and transport)
+and **discretionary** (dining, shopping, entertainment…). Each
+spending occurrence is drawn as `expected × L × E`:
 
-Two deliberate choices make it conservative:
+- `E` is lognormal with mean 1: week-to-week noise.
+- `L` is lognormal with mean 1, drawn **once per path**: the chance that the
+  estimate itself is off, which persists for the whole horizon instead of
+  averaging out.
 
-- **Upcoming income inside the window is ignored.** The estimate never spends
-  money that has not arrived.
-- **The result is clamped at zero**, because a negative "safe to spend" is not a
-  spending instruction. The card explains the clamp and shows the raw value when
-  it applies.
+So the expected amount is unchanged, spending can never be negative, and
+overspending can be large. How much it varies:
 
-This is arithmetic, not inference. It does **not** carry a 95% probability of
-staying above the protected balance, and the UI says so in the expandable
-_"How is this calculated?"_ panel. The `Target confidence` setting is stored for
-Phase 2 and is marked in the interface as a future simulation preference that
-affects nothing today.
+| Source | Essential | Discretionary |
+| ------ | --------- | ------------- |
+| No history (fallback) | 15% week to week, 10% level | 40% week to week, 10% level |
+| ≥ 4 weeks and ≥ 6 transactions of history | measured from weekly totals | measured from weekly totals |
 
-**Phase 2 swap point:** replacing this module with the optimiser touches one
-file. Callers depend only on `estimateSafeToSpend()` and the
-`SafeToSpendEstimate` shape.
+Without history, the result carries a **limited information** warning
+everywhere it is shown. Measured variation is kept between 5% and 150%.
+
+**Unexpected expenses** (a toggle in Settings) are an assumption, not a fact
+about you: Poisson arrivals at about **3 a year**, lognormal costs averaging
+**$600** (standard deviation $600), capped at $5,000. When they are on, they
+replace the questionnaire's planning allowance rather than adding to it.
+
+All of these live in `src/simulation/assumptions.ts`, and the "How is this
+calculated?" panels show the ones used for each result.
+
+### Safe to Spend
+
+Safe to Spend is the **largest purchase today** that keeps the safety
+probability at or above your target (90%, 95% or 99%):
+
+1. For each path, take its lowest balance over the horizon.
+2. A purchase of `x` today lowers every balance by `x`, so the path stays safe
+   exactly when `lowest balance − x ≥ minimum`.
+3. At least `ceil(target × paths)` paths must stay safe, so the answer is that
+   order statistic of the path minima, minus the minimum, **rounded down to
+   the cent** and capped at the current balance.
+4. The amount is then **verified on the same paths**; the engine throws rather
+   than return an amount that misses the target.
+
+It is never negative and never more than the balance. When your plan misses
+the target even without a purchase, the card shows exactly
+**Safe to Spend: $0** and: _"Your current financial forecast does not meet your
+selected safety target, even without an additional purchase."_
+
+### What-if scenarios
+
+| Type | Effect |
+| ---- | ------ |
+| One-time purchase | One payment on its date |
+| Delayed purchase | One payment on a later date (after today) |
+| Recurring expense | Weekly, biweekly or monthly from its start date |
+| Unexpected expense | One payment on its date |
+| Income increase / reduction | Changes each regular paycheck from its date |
+| Rent increase / decrease | Changes each rent or mortgage payment from its date |
+
+Every scenario is evaluated on **the baseline's own paths** (common random
+numbers): same spending draws, same emergencies. The difference between
+before and after is therefore the decision, not sampling noise, and a change
+with no effect gives exactly the baseline result. Comparisons show the
+percentage-point change and whether the target is still met.
+
+### Forecast bands
+
+Each day shows the 10th, 50th and 90th percentiles across paths. **The shaded
+band is the middle 80% of simulated balances, not a 95% confidence
+interval**, and real balances can fall outside it.
+
+### Reproducibility and freshness
+
+- A seeded PRNG (sfc32, seeded through splitmix32) with separate streams for
+  spending and emergencies per path. The same inputs always give the same
+  numbers.
+- Every result carries a fingerprint of its exact input: every profile answer,
+  the account, minimum, target, horizon and the unexpected-expense setting.
+  Queries are keyed by it, so changing anything starts a new simulation and
+  nothing stale is shown.
+- Changing only the minimum or the target reuses the cached paths (an LRU of
+  three path sets); anything else simulates again.
+- The client runs one request at a time and drops superseded ones. Where Web
+  Workers are unavailable, the same handler runs on the main thread.
+- Probabilities are shown to one decimal and never rounded to 100% or 0%
+  unless exact (`>99.9%`, `<0.1%`).
+
+A 10,000-path, 90-day run takes well under 100 ms; comparing scenarios on
+cached paths takes a few milliseconds.
+
+### Demo headline figures
+
+With the default settings (minimum $300, 95% target, 90 days, unexpected
+expenses on), Alex's primary account gives:
+
+| Figure | Value |
+| ------ | ----- |
+| Chance of staying above $300 | 97.81% |
+| Safe to Spend today | $523.24 |
+| After a $600 PlayStation today | 94.38%, below the 95% target |
+
+A test (`data/__tests__/mock-data.test.ts`) asserts these, so the README cannot
+drift from the engine.
 
 ## Onboarding and personal profiles
 
@@ -169,15 +271,16 @@ expenses, and shows a neutral note, not a blocker, when expenses are higher.
 
 A saved profile is converted by `src/lib/profile/timeline.ts` into exactly the
 same `Bill`, `IncomeSource` and `CashFlowEvent` records the demo dataset is
-written in. Both are expanded by the same `expandCashFlowEvents` and projected
-by the same `buildForecast` and `estimateSafeToSpend`; there is no second
+written in. Both are expanded by the same `expandCashFlowEvents` and fed to
+the same simulation (`src/simulation/timeline.ts`); there is no second
 forecasting system.
 
 - Rent and recurring bills become **scheduled** bills on the days you chose.
-- Everyday spending becomes one weekly **estimated** amount, and unexpected
-  expenses (when included) a second one. The allowance assumes about 3
-  surprises a year averaging $600, roughly $150 a month, and the questionnaire
-  says so.
+- Everyday spending becomes two weekly **estimated** amounts, essential and
+  discretionary, which the simulation varies separately. Unexpected expenses
+  (when included) add a planning allowance of about 3 surprises a year
+  averaging $600; the simulation replaces that allowance with randomly drawn
+  emergencies rather than counting both.
 - One-time bills and expected irregular payments become one-off events.
 
 ### No history, no invented history
@@ -188,19 +291,19 @@ A personal profile has no transactions, and Alex's mock transactions are
 - the spending breakdown is built from your estimates and labelled that way;
 - Transaction History and Financial Insights explain that there is no history
   and link to editing the profile;
-- the simulation config declares **fallback assumptions** for volatility
-  (`FALLBACK_VOLATILITY` in `src/lib/constants.ts`) rather than pretending to
-  have learned them.
+- the simulation uses **documented fallback assumptions** for how much
+  spending varies (`FALLBACK_SPENDING_VARIATION` in
+  `src/simulation/assumptions.ts`) rather than pretending to have learned
+  them, and shows a limited-information warning.
 
 ### Stale results
 
 Every dataset has a key. For a profile it includes a fingerprint of every
 answer that affects the forecast, and every query key starts with it, so
 editing an answer discards cached figures instead of showing them for the
-wrong inputs. The Monte Carlo seam (`src/services/simulation.ts`) goes further:
-each `SimulationConfig` carries a fingerprint of all its inputs, including
-preferences, and `isSimulationResultCurrent` rejects any result computed from
-different ones.
+wrong inputs. Simulation results go further: each one carries the fingerprint
+of its full input, including preferences, and a result is only displayed
+next to the input it was computed from.
 
 ### Storage and privacy
 
@@ -295,9 +398,9 @@ src/
 │   ├── (app)/                Everything inside the product
 │   │   ├── layout.tsx        Profile gate + sidebar and header shell
 │   │   ├── overview/         Overview dashboard
-│   │   ├── simulator/        Future Simulator preview (Phase 2)
-│   │   ├── scenarios/        Scenario Lab preview (Phase 2)
-│   │   ├── insights/         Descriptive analytics
+│   │   ├── simulator/        Future Simulator: one what-if, before and after
+│   │   ├── scenarios/        Scenario Lab: up to 3 options side by side
+│   │   ├── insights/         Simulated risk and descriptive analytics
 │   │   ├── transactions/     Searchable, filterable history
 │   │   └── settings/         Financial profile, preferences, reset
 │   ├── layout.tsx            Fonts, metadata, providers
@@ -307,19 +410,35 @@ src/
 │   ├── layout/               Sidebar, header, mobile drawer, profile gate
 │   ├── onboarding/           Wizard, the four steps, bill editor, review
 │   ├── dashboard/            One component per dashboard section
+│   ├── simulation/           Percentile chart, what-if form, before/after,
+│   │                         risk card, model inputs and warnings
 │   ├── providers/            Theme, TanStack Query, workspace state
-│   ├── shared/               Page header, metric card, empty states, skeletons
+│   ├── shared/               Page header, metric card, source labels,
+│   │                         disclaimer, empty states, skeletons
 │   └── ui/                   shadcn/ui primitives
 ├── data/                     Typed mock dataset and the demo profile
-├── hooks/                    Query bindings, today's date, simulation config
+├── hooks/                    Query bindings (data and simulation), today's date
 ├── lib/
 │   ├── onboarding/           Draft, per-step validation, bill list rules
 │   ├── profile/              Profile schemas, monthly normalisation,
 │   │                         profile → canonical timeline
 │   ├── workspace-store.ts    Versioned localStorage store
 │   └── …                     calculations, dates, money, formatters, schemas
-├── services/                 FinancialService interface, dataset-backed
-│                             implementation, simulation seam
+├── simulation/               The Monte Carlo engine (pure TypeScript)
+│   ├── timeline.ts           Canonical timeline → engine input (cents, days)
+│   ├── assumptions.ts        Fallbacks, emergency model, history calibration
+│   ├── random.ts             Seeded PRNG and per-path streams
+│   ├── distributions.ts      Lognormal and Poisson sampling
+│   ├── cashflow.ts           The day-by-day path walk
+│   ├── percentiles.ts        Daily p10 / p50 / p90
+│   ├── optimizer.ts          Safe to Spend, verified on the same paths
+│   ├── scenarios.ts          What-if validation and cash flows
+│   ├── engine.ts             Metrics, risk drivers, path cache, runtime
+│   ├── schemas.ts            Zod validation of inputs and scenarios
+│   └── handler.ts, protocol.ts   Typed worker messages
+├── workers/                  The simulation Web Worker
+├── services/                 FinancialService interface and dataset-backed
+│                             implementation; simulation-service (worker client)
 └── types/                    Domain model and profile types
 ```
 
@@ -327,12 +446,14 @@ src/
 
 Presentation, data and business logic are kept apart:
 
-- **`lib/calculations.ts`** is pure. No React, no network, no clock — every
-  function is a deterministic transform of its inputs, which is what makes the
-  forecast reproducible and the tests meaningful.
-- **`services/`** owns data access behind the `FinancialService` interface.
-- **`hooks/use-financial-data.ts`** owns the query keys and caching. Components
-  never call a service directly.
+- **`lib/calculations.ts`** and **`simulation/`** are pure. No React, no
+  network, no clock — every function is a deterministic transform of its
+  inputs (the simulation's randomness comes from a seed), which is what makes
+  the results reproducible and the tests meaningful.
+- **`services/`** owns data access behind the `FinancialService` interface,
+  and the simulation worker behind `simulation-service`.
+- **`hooks/use-financial-data.ts`** and **`hooks/use-simulation.ts`** own the
+  query keys and caching. Components never call a service directly.
 - **`components/`** render what they are given.
 - The **`(app)` route group** carries the sidebar shell in its own layout, so
   the welcome screen and the 404 page get the providers and the theme without
@@ -349,14 +470,29 @@ Presentation, data and business logic are kept apart:
   a bill due on the 1st is the 1st in every timezone.
 - **Forward windows** all share one convention: the day after the reference date
   through *N* days later (`forwardWindow()`).
-- Payloads that could be mistaken for computed results carry a `method` field
-  (`"illustrative-placeholder"`, `"deterministic-illustrative"`) so the UI can
-  label them honestly.
+- **The simulation works in integer cents and day indices.** Day 0 is the
+  reference date; the balance already reflects it, so day-0 events are only
+  what-ifs made today.
 
 ## Tests
 
-`npm test` runs the Vitest suite. Beyond the dataset invariants above, it
-covers the onboarding system end to end at the logic level:
+`npm test` runs the Vitest suite (197 tests). The engine's tests are in
+`simulation/__tests__/engine.test.ts`, one `describe` block per requirement:
+
+| # | Requirement | # | Requirement |
+| - | ----------- | - | ----------- |
+| 1 | Same seed, same results | 11 | Raising the minimum never raises Safe to Spend |
+| 2 | Income on its exact dates | 12 | Raising the target never raises Safe to Spend |
+| 3 | Rent and bills on their due dates | 13 | Baseline below target → $0 and the exact warning |
+| 4 | No double counting | 14 | Safe to Spend meets the target on the same paths |
+| 5 | Short months (31st, February) | 15 | Common random numbers across scenarios |
+| 6 | No negative spending | 16 | Delayed purchases apply from their date only |
+| 7 | Purchases today checked on day 0 | 17 | Percentiles are correct and ordered |
+| 8 | Temporary breaches fail a path | 18 | Fallback assumptions and the limited-information warning |
+| 9 | Safety probability matches a brute-force recount | 19 | Any input change invalidates results |
+| 10 | Bigger purchases never improve safety | 20 | A hand-computed example, to the cent |
+
+The rest cover the data and the onboarding system at the logic level:
 
 | File | Covers |
 | ---- | ------ |
@@ -366,7 +502,8 @@ covers the onboarding system end to end at the logic level:
 | `lib/onboarding/__tests__/bills.test.ts` | Adding, editing and removing bills; duplicate and rent prevention; due-date limits |
 | `lib/onboarding/__tests__/validation.test.ts` | Required answers per step, payday rules, completion into a valid profile |
 | `lib/__tests__/workspace-store.test.ts` | Navigation and completion, persistence and resume, demo switching, reset, corrupt storage |
-| `services/__tests__/simulation.test.ts` | Stale-result invalidation and fallback volatility for profiles without history |
+| `lib/__tests__/calculations.test.ts`, `dates.test.ts` | Event expansion, windows, spending summaries, calendar arithmetic |
+| `data/__tests__/mock-data.test.ts` | Dataset invariants and the demo headline figures |
 | `data/__tests__/demo-profile.test.ts` | The demo answers agree with the seeded dataset |
 
 ## Prepared for the FastAPI backend
@@ -378,9 +515,13 @@ implement:
 getUserProfile()              getBills(accountId)
 getAccounts()                 getIncomeSources(accountId)
 getAccount(accountId)         getUpcomingCashFlowEvents(request)
-getTransactions(query)        getForecast(request)
-getFinancialSummary(request)  getSpendingSummary(request)
+getTransactions(query)        getFinancialSummary(request)
+getSpendingSummary(request)
 ```
+
+The simulation stays in the browser: it needs only the timeline those
+methods return, so a backend changes where the data comes from, not how it is
+simulated.
 
 Three decisions make the swap a configuration change rather than a refactor:
 
@@ -441,7 +582,7 @@ values do not shift as they change.
 
 | Phase | Scope                                                                    |
 | ----- | ------------------------------------------------------------------------ |
-| 1     | **This frontend** — app shell, dashboard, onboarding, typed services     |
-| 2     | Monte Carlo engine, probabilistic safe-to-spend, percentile bands        |
+| 1     | **Done** — app shell, dashboard, onboarding, typed services              |
+| 2     | **Done** — Monte Carlo engine, Safe to Spend, what-ifs, percentile bands |
 | 2     | FastAPI backend (`backend/`), Capital One Nessie integration             |
 | 3+    | Gemini-generated explanations, voice summaries, authentication           |

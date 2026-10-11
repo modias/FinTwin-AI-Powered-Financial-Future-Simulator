@@ -59,6 +59,13 @@ export interface WorkspaceSnapshot {
   selectedAccountId: string | null;
   profiles: StoredProfiles;
   draft: OnboardingDraft | null;
+  /**
+   * Changes whenever a questionnaire is finished, discarded or replaced, so
+   * screens can drop state from an earlier one. The router keeps visited
+   * routes mounted, so component state alone outlives the questionnaire it
+   * belonged to. Kept in memory only.
+   */
+  draftSession: number;
 }
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -74,6 +81,7 @@ export const SERVER_SNAPSHOT: WorkspaceSnapshot = {
   selectedAccountId: null,
   profiles: EMPTY_PROFILES,
   draft: null,
+  draftSession: 0,
 };
 
 const storedProfilesSchema = z.object({
@@ -98,6 +106,7 @@ export function activeProfileOf(profiles: StoredProfiles): FinancialProfile | nu
 export function createWorkspaceStore(getStorage: () => StorageLike | null) {
   const listeners = new Set<() => void>();
   let snapshot: WorkspaceSnapshot | null = null;
+  let draftSession = 0;
 
   function readJson(key: string): unknown {
     try {
@@ -179,9 +188,17 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
       selectedAccountId: readSelectedAccountId(),
       profiles: readProfiles(),
       draft: readDraft(),
+      draftSession,
     };
 
     return snapshot;
+  }
+
+  /** Saves `draft` as the start of a new questionnaire, or ends it with `null`. */
+  function replaceDraft(draft: OnboardingDraft | null): Partial<WorkspaceSnapshot> {
+    draftSession += 1;
+
+    return { draft, draftSession };
   }
 
   function update(patch: Partial<WorkspaceSnapshot>) {
@@ -202,6 +219,11 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
 
   function handleStorageEvent(event: StorageEvent) {
     if (event.key !== null && !watchedKeys.has(event.key)) return;
+
+    // Another tab may have finished or replaced the questionnaire.
+    if (event.key === null || event.key === STORAGE_KEYS.onboardingDraft) {
+      draftSession += 1;
+    }
 
     snapshot = null;
     emit();
@@ -256,6 +278,27 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
       });
     },
 
+    /** Includes or leaves out unexpected expenses for the active profile. */
+    setActiveEmergenciesEnabled(enabled: boolean, now: Date) {
+      const { profiles } = getSnapshot();
+      const active = activeProfileOf(profiles);
+
+      if (!active || active.emergencies.enabled === enabled) return;
+
+      const updated: FinancialProfile = {
+        ...active,
+        emergencies: { enabled },
+        updatedAt: now.toISOString(),
+      };
+
+      update({
+        profiles:
+          active.source === "demo"
+            ? { ...profiles, demo: updated }
+            : { ...profiles, personal: updated },
+      });
+    },
+
     /**
      * Opens the questionnaire.
      *
@@ -274,7 +317,7 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
 
       const next = active ? draftFromProfile(active) : createEmptyDraft();
 
-      update({ draft: next });
+      update(replaceDraft(next));
 
       return next;
     },
@@ -292,7 +335,7 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
     },
 
     discardDraft() {
-      update({ draft: null });
+      update(replaceDraft(null));
     },
 
     /**
@@ -318,7 +361,7 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
 
       update({
         profiles: { ...profiles, activeSource: "user_entered", personal: result.profile },
-        draft: null,
+        ...replaceDraft(null),
         selectedAccountId: null,
       });
 
@@ -353,7 +396,7 @@ export function createWorkspaceStore(getStorage: () => StorageLike | null) {
 
     /** Forgets every profile and any draft. The theme is kept. */
     resetOnboarding() {
-      update({ profiles: EMPTY_PROFILES, draft: null, selectedAccountId: null });
+      update({ profiles: EMPTY_PROFILES, ...replaceDraft(null), selectedAccountId: null });
     },
   };
 }

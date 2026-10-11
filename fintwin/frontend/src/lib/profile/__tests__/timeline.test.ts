@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { expandCashFlowEvents, forwardWindow } from "@/lib/calculations";
 import {
   EMERGENCY_ALLOWANCE_BILL_ID,
-  EVERYDAY_SPENDING_BILL_ID,
+  DISCRETIONARY_SPENDING_BILL_ID,
+  ESSENTIAL_SPENDING_BILL_ID,
   HOUSING_BILL_ID,
   PERSONAL_ACCOUNT_ID,
   profileDatasetKey,
@@ -221,13 +222,34 @@ describe("estimated spending", () => {
         amountsCents: { groceries: 8_000, transportation: 2_000, dining: 0, shopping: 0, entertainment: 0, personal_care: 0, other: 0 },
       },
     });
-    const bill = profileToDataset(profile).bills.find(
-      (candidate) => candidate.id === EVERYDAY_SPENDING_BILL_ID,
-    );
+    const { bills } = profileToDataset(profile);
 
-    expect(bill).toMatchObject({ amount: 100, cadence: "weekly", confidence: "estimated" });
+    expect(bills.find((candidate) => candidate.id === ESSENTIAL_SPENDING_BILL_ID)).toMatchObject({
+      amount: 100,
+      cadence: "weekly",
+      confidence: "estimated",
+      spendingKind: "essential",
+    });
+    // Nothing discretionary was entered, so there is no second estimate.
+    expect(bills.some((candidate) => candidate.id === DISCRETIONARY_SPENDING_BILL_ID)).toBe(false);
     // Four weekly estimates in the first 30 days, not five.
-    expect(datesOf(eventsFor(profile, 30), EVERYDAY_SPENDING_BILL_ID)).toHaveLength(4);
+    expect(datesOf(eventsFor(profile, 30), ESSENTIAL_SPENDING_BILL_ID)).toHaveLength(4);
+  });
+
+  it("separates essential from discretionary spending without changing the total", () => {
+    const { bills } = profileToDataset(
+      makeProfile({
+        variableSpending: {
+          period: "weekly",
+          amountsCents: { groceries: 8_000, transportation: 2_000, dining: 3_000, shopping: 1_500, entertainment: 500, personal_care: 0, other: 0 },
+        },
+      }),
+    );
+    const essential = bills.find((bill) => bill.id === ESSENTIAL_SPENDING_BILL_ID);
+    const discretionary = bills.find((bill) => bill.id === DISCRETIONARY_SPENDING_BILL_ID);
+
+    expect(essential).toMatchObject({ amount: 100, spendingKind: "essential" });
+    expect(discretionary).toMatchObject({ amount: 50, spendingKind: "discretionary" });
   });
 
   it("adds the unexpected-expense allowance only when the user includes it", () => {
@@ -238,6 +260,7 @@ describe("estimated spending", () => {
       amount: 34.62,
       cadence: "weekly",
       confidence: "estimated",
+      spendingKind: "unexpected",
     });
     expect(without.bills.some((bill) => bill.id === EMERGENCY_ALLOWANCE_BILL_ID)).toBe(false);
   });

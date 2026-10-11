@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   averageDailySpending,
-  buildForecast,
   expandCashFlowEvents,
   forwardWindow,
   largestExpense,
@@ -177,123 +176,6 @@ describe("expandCashFlowEvents", () => {
       "income",
       "expense",
     ]);
-  });
-});
-
-describe("buildForecast", () => {
-  const events: CashFlowEvent[] = [
-    {
-      id: "e1",
-      accountId: ACCOUNT,
-      name: "Utilities",
-      category: "Utilities",
-      amount: 80,
-      date: "2026-10-14",
-      direction: "expense",
-      confidence: "scheduled",
-      sourceId: "b1",
-    },
-    {
-      id: "e2",
-      accountId: ACCOUNT,
-      name: "Groceries",
-      category: "Food",
-      amount: 200,
-      date: "2026-10-15",
-      direction: "expense",
-      confidence: "estimated",
-      sourceId: "b2",
-    },
-    {
-      id: "e3",
-      accountId: ACCOUNT,
-      name: "Paycheck",
-      category: "Income",
-      amount: 1500,
-      date: "2026-10-16",
-      direction: "income",
-      confidence: "scheduled",
-      sourceId: "i1",
-    },
-  ];
-
-  const series = buildForecast({
-    accountId: ACCOUNT,
-    startDate: REFERENCE,
-    startingBalance: 2143,
-    protectedBalance: 300,
-    horizonDays: 5,
-    events,
-  });
-
-  it("includes today plus every day of the horizon", () => {
-    expect(series.points).toHaveLength(6);
-    expect(series.points[0].date).toBe(REFERENCE);
-    expect(series.points[5].date).toBe("2026-10-17");
-  });
-
-  it("starts from the account's actual balance", () => {
-    expect(series.points[0].projectedBalance).toBe(2143);
-  });
-
-  it("walks the balance through each day's events", () => {
-    expect(series.points.map((point) => point.projectedBalance)).toEqual([
-      2143, 2143, 2063, 1863, 3363, 3363,
-    ]);
-  });
-
-  it("separates scheduled bills from estimated spending on each day", () => {
-    const groceryDay = series.points[3];
-
-    expect(groceryDay.bills).toBe(0);
-    expect(groceryDay.estimatedSpending).toBe(200);
-    expect(series.points[2].bills).toBe(80);
-  });
-
-  it("reports the trough and the ending balance", () => {
-    expect(series.lowestProjectedBalance).toBe(1863);
-    expect(series.lowestProjectedBalanceDate).toBe("2026-10-15");
-    expect(series.endingBalance).toBe(3363);
-  });
-
-  it("counts days spent below the protected balance", () => {
-    expect(series.daysBelowProtectedBalance).toBe(0);
-
-    const stressed = buildForecast({
-      accountId: ACCOUNT,
-      startDate: REFERENCE,
-      startingBalance: 400,
-      protectedBalance: 300,
-      horizonDays: 5,
-      events: [events[0], events[1]],
-    });
-
-    // Below 300 from 2026-10-14 (320 - ... ) onwards: 14th is 320, so the dip
-    // starts on the 15th and holds for the remaining three days.
-    expect(stressed.daysBelowProtectedBalance).toBe(3);
-  });
-
-  it("labels itself as deterministic rather than simulated", () => {
-    expect(series.method).toBe("deterministic-illustrative");
-  });
-
-  it("repeats the protected balance on every point for the threshold line", () => {
-    expect(
-      series.points.every((point) => point.protectedBalance === 300),
-    ).toBe(true);
-  });
-
-  it("is deterministic: the same inputs give the same output", () => {
-    const repeat = buildForecast({
-      accountId: ACCOUNT,
-      startDate: REFERENCE,
-      startingBalance: 2143,
-      protectedBalance: 300,
-      horizonDays: 5,
-      events,
-    });
-
-    expect(repeat).toEqual(series);
   });
 });
 

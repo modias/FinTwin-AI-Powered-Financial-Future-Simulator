@@ -88,11 +88,6 @@ export function MobileNavigation() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2 text-sm font-medium">
                         {item.label}
-                        {item.isPreview ? (
-                          <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                            Soon
-                          </span>
-                        ) : null}
                       </span>
                       <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                         {item.description}

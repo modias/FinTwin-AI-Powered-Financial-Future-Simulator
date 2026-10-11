@@ -45,6 +45,8 @@ interface WorkspaceContextValue {
   preferences: UserPreferences;
   updatePreferences: (patch: Partial<UserPreferences>) => void;
   resetPreferences: () => void;
+  /** Includes or leaves out simulated unexpected expenses for the active profile. */
+  setEmergenciesEnabled: (enabled: boolean) => void;
 
   profiles: StoredProfiles;
   /** The profile driving the dashboard; `null` before onboarding. */
@@ -57,6 +59,8 @@ interface WorkspaceContextValue {
   setSelectedAccountId: (accountId: string) => void;
 
   draft: OnboardingDraft | null;
+  /** Changes when a questionnaire ends or is replaced; see `WorkspaceSnapshot`. */
+  draftSession: number;
   startOnboarding: (from: "blank" | "active") => OnboardingDraft;
   saveDraft: (draft: OnboardingDraft) => void;
   /** Merges `patch` into the latest saved draft, or into a new one. */
@@ -85,7 +89,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     () => false,
   );
 
-  const { theme, profiles, draft, selectedAccountId: storedAccountId } = snapshot;
+  const {
+    theme,
+    profiles,
+    draft,
+    draftSession,
+    selectedAccountId: storedAccountId,
+  } = snapshot;
   const activeProfile = activeProfileOf(profiles);
 
   const dataset = useMemo(
@@ -130,6 +140,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     workspaceStore.updateActivePreferences(DEFAULT_PROFILE_PREFERENCES);
   }, []);
 
+  const setEmergenciesEnabled = useCallback((enabled: boolean) => {
+    workspaceStore.setActiveEmergenciesEnabled(enabled, new Date());
+  }, []);
+
   const setSelectedAccountId = useCallback((accountId: string) => {
     workspaceStore.setSelectedAccountId(accountId);
   }, []);
@@ -147,6 +161,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       preferences,
       updatePreferences,
       resetPreferences,
+      setEmergenciesEnabled,
       profiles,
       activeProfile,
       dataset,
@@ -154,6 +169,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectedAccountId,
       setSelectedAccountId,
       draft,
+      draftSession,
       startOnboarding: workspaceStore.startOnboarding,
       saveDraft: workspaceStore.saveDraft,
       patchDraft: workspaceStore.patchDraft,
@@ -168,12 +184,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       preferences,
       updatePreferences,
       resetPreferences,
+      setEmergenciesEnabled,
       profiles,
       activeProfile,
       dataset,
       selectedAccountId,
       setSelectedAccountId,
       draft,
+      draftSession,
       completeOnboarding,
       activateDemo,
     ],

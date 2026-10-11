@@ -1,11 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, Info, ShieldCheck, Wallet } from "lucide-react";
+import { ChevronDown, FlaskConical, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { useActiveWorkspace } from "@/components/providers/workspace-provider";
-import { IllustrativeBadge } from "@/components/shared/disclosure-badges";
-import { Badge } from "@/components/ui/badge";
+import {
+  SimulatedBadge,
+  SimulationDisclaimer,
+} from "@/components/shared/disclosure-badges";
+import { ModelInputs, ModelWarnings } from "@/components/simulation/model-inputs";
+import { SimulationError, SimulationRunning } from "@/components/simulation/simulation-states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,36 +20,51 @@ import {
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useFinancialSummary } from "@/hooks/use-financial-data";
-import { formatCurrency, splitCurrency } from "@/lib/formatters";
+import { useSafeToSpend } from "@/hooks/use-safe-to-spend";
+import { addDays, formatMediumDate } from "@/lib/dates";
+import { formatProbability, splitCurrency } from "@/lib/formatters";
+import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { SafeToSpendEstimate } from "@/types/financial";
+import type { SimulationResult } from "@/simulation/types";
+
+const pathCountFormatter = new Intl.NumberFormat("en-US");
 
 /**
- * The dashboard's headline answer to "how much can I spend today?".
- *
- * Phase 1 shows a transparent subtraction (see `services/safe-to-spend.ts`) and
- * says so in three places: the badge, the allocation bar caption, and the
- * expandable breakdown. It never claims a probability.
+ * The dashboard's headline answer to "how much can I spend today?": the
+ * largest purchase today that still keeps the balance above the protected
+ * minimum, at every point in the horizon, in at least the target share of
+ * simulated futures.
  */
 export function SafeToSpendCard() {
-  const { preferences, dataset } = useActiveWorkspace();
-  const { data: summary, isPending } = useFinancialSummary();
+  const { dataset } = useActiveWorkspace();
+  const { data: result, input, error, retry } = useSafeToSpend();
 
-  if (isPending || !summary) {
-    return <SafeToSpendCardSkeleton />;
+  if (error) {
+    return (
+      <Card className="[--card-spacing:--spacing(6)]">
+        <CardContent>
+          <SimulationError error={error} onRetry={retry} />
+        </CardContent>
+      </Card>
+    );
   }
 
-  const estimate = summary.safeToSpend;
-  const { whole, fraction } = splitCurrency(estimate.amount);
+  if (!result) {
+    return <SafeToSpendCardSkeleton pathCount={input.pathCount} />;
+  }
+
+  const { safeToSpend, safety } = result;
+  const target = Math.round(result.targetConfidence * 100);
+  const endDate = addDays(result.referenceDate, result.horizonDays);
+  const fails = safeToSpend.status !== "meets_target";
 
   return (
-    <Card className="gap-0 ring-primary/20 [--card-spacing:--spacing(6)]">
+    <Card
+      className={cn(
+        "gap-0 [--card-spacing:--spacing(6)]",
+        fails ? "ring-risk/25" : "ring-primary/20",
+      )}
+    >
       <CardContent className="space-y-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
@@ -52,278 +72,172 @@ export function SafeToSpendCard() {
               <h2 className="text-[13px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                 Safe to spend today
               </h2>
-              <IllustrativeBadge />
+              <SimulatedBadge pathCount={result.pathCount} />
             </div>
 
-            <p className="tabular-figures font-heading leading-none font-semibold tracking-tight">
-              <span className="text-[44px] sm:text-[56px]">{whole}</span>
-              <span className="ml-0.5 text-2xl text-muted-foreground">
-                .{fraction}
-              </span>
-            </p>
+            {fails ? (
+              <div className="space-y-2">
+                <p className="tabular-figures font-heading text-[32px] leading-tight font-semibold tracking-tight sm:text-[40px]">
+                  Safe to Spend: $0
+                </p>
+                <p className="flex max-w-xl items-start gap-2 text-sm leading-relaxed text-risk">
+                  <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  {safeToSpend.warning}
+                </p>
+              </div>
+            ) : (
+              <HeadlineAmount cents={safeToSpend.amountCents} />
+            )}
 
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-              {estimate.clamped ? (
+              {fails ? (
                 <>
-                  Your known obligations for the next{" "}
-                  {estimate.reservationWindowDays} days already exceed what is
-                  available above your protected balance, so this estimate is{" "}
-                  <span className="text-foreground">held at $0</span>.
+                  Without any extra purchase, your balance stays above{" "}
+                  {formatCents(result.protectedMinimumCents)} through{" "}
+                  {formatMediumDate(endDate)} in{" "}
+                  <span className="text-foreground">{formatProbability(safety.safetyProbability)}</span>{" "}
+                  of {pathCountFormatter.format(result.pathCount)} simulated futures — short of your{" "}
+                  {target}% target.
                 </>
               ) : (
                 <>
-                  What&rsquo;s left after setting aside the next{" "}
-                  {estimate.reservationWindowDays} days of bills and estimated
-                  spending, and protecting{" "}
-                  {formatCurrency(estimate.minimumProtectedBalance)}.
+                  The most you could spend today and still stay above{" "}
+                  {formatCents(result.protectedMinimumCents)} every day through{" "}
+                  {formatMediumDate(endDate)} in at least {target}% of{" "}
+                  {pathCountFormatter.format(result.pathCount)} simulated futures.
+                  {safeToSpend.limitedBy === "available_balance"
+                    ? " That’s everything above your protected minimum today."
+                    : ""}{" "}
+                  An estimate, not a guarantee.
                 </>
               )}
             </p>
+
+            <Button asChild variant="outline" size="sm">
+              <Link href="/simulator">
+                <FlaskConical aria-hidden />
+                Test a purchase
+              </Link>
+            </Button>
           </div>
 
           <dl className="grid shrink-0 grid-cols-2 gap-x-8 gap-y-4 lg:gap-x-10">
+            <SupportingStat label="Current balance" value={formatCents(result.openingBalanceCents)} />
             <SupportingStat
-              label="Current balance"
-              value={formatCurrency(summary.currentBalance)}
+              label="Protected minimum"
+              value={formatCents(result.protectedMinimumCents)}
             />
             <SupportingStat
-              label="Protected minimum balance"
-              value={formatCurrency(summary.protectedMinimumBalance)}
+              label="Chance of staying above it"
+              value={formatProbability(safety.safetyProbability)}
+              tone={safety.safePaths >= safeToSpend.requiredSafePaths ? "positive" : "risk"}
             />
+            <SupportingStat label="Safety target" value={`${target}%`} />
+            <SupportingStat label="Forecast horizon" value={`${result.horizonDays} days`} />
             <SupportingStat
-              label="Target confidence"
-              value={`${preferences.targetConfidence}%`}
-              note="Saved for the Phase 2 simulation. It does not affect this estimate."
-            />
-            <SupportingStat
-              label="Forecast horizon"
-              value={`${preferences.forecastHorizonDays} days`}
+              label="Simulations"
+              value={pathCountFormatter.format(result.pathCount)}
             />
           </dl>
         </div>
 
-        <AllocationBar estimate={estimate} />
+        <ModelWarnings warnings={result.warnings} />
 
         <Separator />
 
-        <CalculationDisclosure
-          estimate={estimate}
-          targetConfidence={preferences.targetConfidence}
-          isDemo={dataset.source === "demo"}
-        />
+        <CalculationDisclosure result={result} isDemo={dataset.source === "demo"} />
       </CardContent>
     </Card>
+  );
+}
+
+function HeadlineAmount({ cents }: { cents: number }) {
+  const { whole, fraction } = splitCurrency(cents / 100);
+
+  return (
+    <p className="tabular-figures font-heading leading-none font-semibold tracking-tight">
+      <span className="text-[44px] sm:text-[56px]">{whole}</span>
+      <span className="ml-0.5 text-2xl text-muted-foreground">.{fraction}</span>
+    </p>
   );
 }
 
 function SupportingStat({
   label,
   value,
-  note,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
-  note?: string;
+  tone?: "neutral" | "positive" | "risk";
 }) {
   return (
     <div className="space-y-1">
-      <dt className="flex items-center gap-1 text-xs text-muted-foreground">
-        {label}
-        {note ? (
-          <Tooltip>
-            <TooltipTrigger
-              className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              aria-label={`About ${label}`}
-            >
-              <Info aria-hidden className="size-3 text-muted-foreground" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[240px]">{note}</TooltipContent>
-          </Tooltip>
-        ) : null}
-      </dt>
-      <dd className="tabular-figures font-heading text-lg font-medium">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          "tabular-figures font-heading text-lg font-medium",
+          tone === "positive" && "text-success",
+          tone === "risk" && "text-risk",
+        )}
+      >
         {value}
       </dd>
     </div>
   );
 }
 
-/**
- * Shows how the current balance divides between what is spendable and what is
- * already committed. Widths come from the same numbers as the breakdown.
- */
-function AllocationBar({ estimate }: { estimate: SafeToSpendEstimate }) {
-  const segments = [
-    {
-      label: "Safe to spend",
-      amount: estimate.amount,
-      color: "var(--primary)",
-    },
-    {
-      label: "Reserved bills",
-      amount: estimate.reservedUpcomingBills,
-      color: "var(--chart-3)",
-    },
-    {
-      label: "Estimated spending",
-      amount: estimate.expectedEssentialExpenses,
-      color: "var(--chart-5)",
-    },
-    {
-      label: "Protected minimum",
-      amount: estimate.minimumProtectedBalance,
-      color: "var(--success)",
-    },
-  ].filter((segment) => segment.amount > 0);
-
-  const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
-
-  if (total <= 0) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-3">
-      <div
-        className="flex h-2 gap-0.5 overflow-hidden rounded-full"
-        role="img"
-        aria-label={segments
-          .map((segment) => `${segment.label} ${formatCurrency(segment.amount)}`)
-          .join(", ")}
-      >
-        {segments.map((segment) => (
-          <span
-            key={segment.label}
-            className="h-full first:rounded-l-full last:rounded-r-full"
-            style={{
-              width: `${(segment.amount / total) * 100}%`,
-              backgroundColor: segment.color,
-            }}
-          />
-        ))}
-      </div>
-
-      <ul className="flex flex-wrap gap-x-5 gap-y-2">
-        {segments.map((segment) => (
-          <li
-            key={segment.label}
-            className="flex items-center gap-2 text-xs text-muted-foreground"
-          >
-            <span
-              aria-hidden
-              className="size-2 rounded-full"
-              style={{ backgroundColor: segment.color }}
-            />
-            {segment.label}
-            <span className="tabular-figures text-foreground">
-              {formatCurrency(segment.amount)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function CalculationDisclosure({
-  estimate,
-  targetConfidence,
-  isDemo,
-}: {
-  estimate: SafeToSpendEstimate;
-  targetConfidence: number;
-  isDemo: boolean;
-}) {
+function CalculationDisclosure({ result, isDemo }: { result: SimulationResult; isDemo: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const target = Math.round(result.targetConfidence * 100);
+  const { safeToSpend } = result;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="-ml-2.5">
-          <ShieldCheck aria-hidden />
-          How is this calculated?
-          <ChevronDown
-            aria-hidden
-            className={cn(
-              "transition-transform duration-200",
-              isOpen && "rotate-180",
-            )}
-          />
-        </Button>
-      </CollapsibleTrigger>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="-ml-2.5 self-start">
+            <ShieldCheck aria-hidden />
+            How is this calculated?
+            <ChevronDown
+              aria-hidden
+              className={cn("transition-transform duration-200", isOpen && "rotate-180")}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <SimulationDisclaimer className="max-w-xl sm:text-right" />
+      </div>
 
       <CollapsibleContent className="overflow-hidden data-closed:animate-collapsible-up data-open:animate-collapsible-down">
-        <div className="space-y-4 pt-4">
-          <dl className="space-y-0">
-            {estimate.breakdown.map((line, index) => (
-              <div
-                key={line.label}
-                className={cn(
-                  "flex items-start justify-between gap-6 py-2.5",
-                  index > 0 && "border-t border-border/60",
-                )}
-              >
-                <div className="space-y-0.5">
-                  <dt className="text-[13px] font-medium">{line.label}</dt>
-                  <dd className="text-xs leading-relaxed text-muted-foreground">
-                    {line.description}
-                  </dd>
-                </div>
-                <span
-                  className={cn(
-                    "tabular-figures shrink-0 text-[13px] font-medium",
-                    line.effect === "subtract" && "text-muted-foreground",
-                  )}
-                >
-                  {line.effect === "add" ? "" : "\u2212"}
-                  {formatCurrency(line.amount)}
-                </span>
-              </div>
-            ))}
+        <div className="space-y-5 pt-4">
+          <ol className="list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-muted-foreground">
+            <li>
+              FinTwin simulates {pathCountFormatter.format(result.pathCount)} possible versions of
+              the next {result.horizonDays} days. Income and bills land on their dates in every
+              one; everyday spending and unexpected expenses are drawn at random in each.
+            </li>
+            <li>
+              A simulated future counts as <span className="text-foreground">safe</span> only if
+              the balance never drops below your protected minimum — not just at the end, but at
+              every point, including right after a purchase today.
+            </li>
+            <li>
+              Safe to spend is the largest amount you could spend today and still have at least{" "}
+              {target}% of futures safe ({pathCountFormatter.format(safeToSpend.requiredSafePaths)}{" "}
+              of {pathCountFormatter.format(result.pathCount)}). It is checked against the same
+              simulated futures and rounded down to the cent.
+            </li>
+            <li>
+              {target}% is a target for this model, not a guarantee: the model can be wrong, and
+              real life can differ from all of its simulated futures.
+            </li>
+          </ol>
 
-            <div className="flex items-center justify-between gap-6 border-t border-border py-3">
-              <dt className="text-[13px] font-medium">
-                Illustrative safe-to-spend estimate
-              </dt>
-              <span className="tabular-figures shrink-0 font-heading text-base font-semibold">
-                {formatCurrency(estimate.amount)}
-              </span>
-            </div>
-          </dl>
-
-          {estimate.clamped ? (
-            <div className="flex items-start gap-2 rounded-lg bg-warning/8 p-3">
-              <Wallet aria-hidden className="mt-0.5 size-3.5 text-warning" />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                The raw result was{" "}
-                <span className="tabular-figures text-foreground">
-                  {formatCurrency(estimate.rawAmount)}
-                </span>
-                . FinTwin clamps the displayed estimate to a minimum of $0
-                because a negative amount is not a spending instruction.
-              </p>
-            </div>
-          ) : null}
-
-          <div className="space-y-2 rounded-lg bg-muted/50 p-3.5">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-warning/30 text-warning">
-                Phase 1 placeholder
-              </Badge>
-            </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              This figure is simple arithmetic on{" "}
-              {isDemo ? "demonstration data" : "the figures you entered"}. It
-              does not model uncertainty and it is{" "}
-              <span className="text-foreground">
-                not a {targetConfidence}% probability of staying above your
-                protected balance
-              </span>
-              . The Monte Carlo optimiser that produces a probabilistic
-              safe-to-spend amount arrives in Phase 2. Upcoming income inside
-              the window is deliberately ignored, which keeps this estimate
-              conservative.
-            </p>
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              What went in
+            </h3>
+            <ModelInputs result={result} isDemo={isDemo} />
           </div>
         </div>
       </CollapsibleContent>
@@ -331,7 +245,7 @@ function CalculationDisclosure({
   );
 }
 
-function SafeToSpendCardSkeleton() {
+function SafeToSpendCardSkeleton({ pathCount }: { pathCount: number }) {
   return (
     <Card className="gap-0 [--card-spacing:--spacing(6)]">
       <CardContent className="space-y-6">
@@ -339,10 +253,10 @@ function SafeToSpendCardSkeleton() {
           <div className="space-y-4">
             <Skeleton className="h-4 w-44" />
             <Skeleton className="h-14 w-64" />
-            <Skeleton className="h-3.5 w-80 max-w-full" />
+            <SimulationRunning pathCount={pathCount} />
           </div>
           <div className="grid grid-cols-2 gap-x-10 gap-y-4">
-            {Array.from({ length: 4 }, (_, index) => (
+            {Array.from({ length: 6 }, (_, index) => (
               <div key={index} className="space-y-2">
                 <Skeleton className="h-3 w-28" />
                 <Skeleton className="h-5 w-20" />
@@ -350,7 +264,6 @@ function SafeToSpendCardSkeleton() {
             ))}
           </div>
         </div>
-        <Skeleton className="h-2 w-full rounded-full" />
         <Skeleton className="h-8 w-48" />
       </CardContent>
     </Card>

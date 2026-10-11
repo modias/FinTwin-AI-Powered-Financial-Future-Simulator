@@ -2,6 +2,7 @@ import { LineChart, Shield, Wallet } from "lucide-react";
 
 import { PrivacyNotice } from "@/components/onboarding/privacy-notice";
 import { WelcomeActions } from "@/components/onboarding/welcome-actions";
+import { SIMULATION_DISCLAIMER } from "@/components/shared/disclosure-badges";
 import { FinTwinLogo } from "@/components/shared/fintwin-logo";
 import { APP_NAME } from "@/lib/constants";
 
@@ -49,25 +50,24 @@ export default function WelcomePage() {
           <HighlightCard
             icon={Wallet}
             title="Safe to spend"
-            description="Today's balance, minus what the next 30 days already owe."
+            description="The most you can spend today while staying above your floor in most simulated futures."
           />
           <HighlightCard
             icon={LineChart}
-            title="Balance forecast"
-            description="Your pay and bills projected across 30, 60 or 90 days."
+            title="What-if decisions"
+            description="See how a purchase changes your chance of staying safe, before you make it."
           />
           <HighlightCard
             icon={Shield}
             title="Protected floor"
-            description="The minimum balance every estimate is kept clear of."
+            description="The minimum balance every simulated future is tested against."
           />
         </ul>
 
         <PrivacyNotice className="animate-in fade-in mt-8 delay-300 duration-700" />
 
         <p className="animate-in fade-in mt-6 max-w-md text-xs leading-relaxed text-muted-foreground delay-300 duration-700">
-          The Monte Carlo simulation engine isn&rsquo;t part of this build, so
-          nothing here claims a probability of financial safety.
+          {SIMULATION_DISCLAIMER}
         </p>
       </div>
     </main>
